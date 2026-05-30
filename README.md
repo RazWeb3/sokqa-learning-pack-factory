@@ -1,52 +1,55 @@
 # SokQA Learning Pack Factory
 
-マニュアルやドキュメントを貼り付けるだけで、SokQAにそのまま取り込める学習パック
-（document / quiz / manifest）を数分で自動生成します。
+Paste a manual or document, and automatically generate a SokQA-ready
+learning pack (document / quiz / manifest) in minutes.
 
-## 課題
-コンビニ・飲食・ホテル・小売などの現場では、研修教材を手作業で作っており、
-特に外国人スタッフ向けの教材は1パックあたり4〜8時間かかっていました。
+## Problem
+At convenience stores, restaurants, hotels, and retail shops, training
+materials are still created by hand. Building materials for foreign staff
+in particular took 4–8 hours per pack.
 
-## 解決
-マニュアルを入力すると、4ステップのワークフロー
-（分析 → 学習文書 → クイズ → manifest）が学習パックを自動生成し、
-QRコードからSokQAへインポートできます。カスタムスキーマは使わず、
-SokQAの既存フォーマットにそのまま適合させています。
+## Solution
+Paste in a manual, and a 4-step workflow (Analyze → Document → Quiz →
+Manifest) automatically generates a learning pack that can be imported
+into SokQA via a QR code. It uses no custom schema — the output conforms
+directly to SokQA's existing formats.
 
-## 仕組み（概念上の4ステップ / スキル定義）
-アプリ内で4つのエージェントが別プロセスとして動くわけではなく、
-設計ガイド（.trae/skills）として以下の役割を定義しています。
-- 決める（spec）: 何を作るか・何をしないかを定める仕様
-- 作る（orchestrator）: マニュアルから学習パックを安定して生成
-- 配る（nextjs-api）: 生成物を書き出し、URLで配信
-- 確かめる（validator）: SokQAに取り込める形かを検証
+## How It Works (conceptual 4 steps / skill definitions)
+These are not separate agents running as independent processes inside the
+app. They are design guides (`.trae/skills`) that define the following roles:
+- Define (spec): the specification for what to build and what not to build
+- Build (orchestrator): generate the learning pack reliably from the manual
+- Deliver (nextjs-api): write out the generated files and serve them via URL
+- Verify (validator): check that the output is importable into SokQA
 
-## 技術スタック
+## Tech Stack
 - Next.js (App Router) + TypeScript
-- Vercel（静的配信）
-- LLM API（OpenAI互換）
-- TRAE SOLO で開発
+- Vercel (static hosting)
+- LLM API (OpenAI-compatible)
+- Built with TRAE SOLO
 
-## 使い方（ローカル）
+## Getting Started (local)
 1. `npm install`
-2. `.env.local` に以下を設定
-   - `OPENAI_API_KEY`（生成にLLMを使うため必須）
-   - `NEXT_PUBLIC_BASE_URL`（manifestに埋め込むURL。インポート時に到達できる
-     本番ドメインを `https://...` で指定。例: `https://pe-gules.vercel.app`）
-3. `npm run dev` で起動し、http://localhost:3000 を開く
-4. マニュアルを貼り付けて Generate
-5. 生成された `public/generated-pack/<id>/` を `vercel --prod` でデプロイ
-6. 表示されたQRコードからSokQAへインポート
+2. Set the following in `.env.local`:
+   - `OPENAI_API_KEY` (required — generation uses an LLM)
+   - `NEXT_PUBLIC_BASE_URL` (the URL embedded in the manifest; must point to
+     a production domain reachable at import time, e.g.
+     `https://pe-gules.vercel.app`)
+3. Run `npm run dev` and open http://localhost:3000
+4. Paste a manual and click Generate
+5. Deploy the generated `public/generated-pack/<id>/` with `vercel --prod`
+6. Import into SokQA via the displayed QR code
 
-## 生成物
+## Output
 - `manifest.json`
-- `doc_01.json`（document）
-- `quiz_01.json`（5問のquiz）
+- `doc_01.json` (document)
+- `quiz_01.json` (5-question quiz)
 
-## 現状と今後
-コア機能（生成 → 配信 → QRインポート）を実装済み。
-現状の生成物はドキュメント1本・クイズ5問に固定しています。
-将来的にドキュメント・クイズの本数拡張や、生成精度の向上を予定しています。
+## Status & Roadmap
+Core functionality (generate → deliver → QR import) is implemented.
+Current output is fixed to one document and a 5-question quiz.
+Planned next steps: expanding the number of documents and quizzes, and
+improving generation quality.
 
-## ハッカソン
+## Hackathon
 TRAE SOLO Hackathon @ Japan / Productivity Enhancement Track
