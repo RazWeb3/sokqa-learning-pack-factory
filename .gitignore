@@ -32,7 +32,9 @@ pnpm-debug.log*
 *.log
 
 # IDE / OS
-.trae/
+.trae/*
+!.trae/skills/
+!.trae/skills/**
 .vscode/
 .idea/
 .DS_Store
