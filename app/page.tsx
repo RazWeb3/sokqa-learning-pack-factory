@@ -1,14 +1,16 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { QRCodeCanvas } from "qrcode.react"
+import { buildLearningPackZipBlob } from "@/lib/learning-pack-zip"
+import type { LearningPack } from "@/lib/learning-pack"
 
 type GenerateResponse =
   | {
       ok: true
-      packId: string
-      manifestUrl: string
-      deploy: { attempted: boolean; ok: boolean; message: string }
+      documents: LearningPack["documents"]
+      quizzes: LearningPack["quizzes"]
+      metadata: LearningPack["metadata"]
+      validation: LearningPack["validation"]
     }
   | { ok: false; error: string }
 
@@ -21,25 +23,17 @@ const defaultText = `【例】コンビニ接客の基本
 
 export default function HomePage() {
   const [text, setText] = useState<string>(defaultText)
-  const [status, setStatus] = useState<
-    "idle" | "analyzing" | "documents" | "quiz" | "manifest" | "deploy" | "done" | "error"
-  >("idle")
+  const [status, setStatus] = useState<"idle" | "generating" | "validating" | "ready" | "downloading" | "error">("idle")
   const [result, setResult] = useState<GenerateResponse | null>(null)
 
   const canGenerate = useMemo(
-    () => text.trim().length > 0 && (status === "idle" || status === "done" || status === "error"),
+    () => text.trim().length > 0 && (status === "idle" || status === "ready" || status === "error"),
     [status, text],
   )
 
   async function onGenerate() {
     setResult(null)
-    setStatus("analyzing")
-
-    const timeouts: number[] = []
-    timeouts.push(window.setTimeout(() => setStatus("documents"), 500))
-    timeouts.push(window.setTimeout(() => setStatus("quiz"), 1000))
-    timeouts.push(window.setTimeout(() => setStatus("manifest"), 1500))
-    timeouts.push(window.setTimeout(() => setStatus("deploy"), 2000))
+    setStatus("generating")
 
     try {
       const response = await fetch("/api/generate", {
@@ -55,21 +49,44 @@ export default function HomePage() {
         return
       }
 
-      setStatus("done")
+      setStatus("validating")
       setResult(data)
+      setStatus("ready")
     } catch (e) {
       setResult({ ok: false, error: e instanceof Error ? e.message : "Unknown error" })
       setStatus("error")
-    } finally {
-      for (const t of timeouts) window.clearTimeout(t)
+    }
+  }
+
+  async function onDownloadZip() {
+    if (!result?.ok) {
+      return
+    }
+
+    setStatus("downloading")
+
+    try {
+      const blob = await buildLearningPackZipBlob(result)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = "learning-pack.zip"
+      document.body.appendChild(anchor)
+      anchor.click()
+      anchor.remove()
+      URL.revokeObjectURL(url)
+      setStatus("ready")
+    } catch (error) {
+      setResult({ ok: false, error: error instanceof Error ? error.message : "ZIP generation failed" })
+      setStatus("error")
     }
   }
 
   return (
     <main style={{ maxWidth: 900, margin: "40px auto", padding: 16 }}>
-      <h1 style={{ fontSize: 28, margin: 0 }}>SokQA Learning Pack Factory</h1>
+      <h1 style={{ fontSize: 28, margin: 0 }}>Learning Pack Generator OSS</h1>
       <p style={{ marginTop: 8, color: "#444" }}>
-        Paste a manual → generate JSON → deploy static files → scan QR to import into SokQA
+        Paste a manual, generate reusable learning content, validate it, and download it as a ZIP package.
       </p>
 
       <div style={{ display: "grid", gap: 12 }}>
@@ -110,12 +127,10 @@ export default function HomePage() {
           <div style={{ fontWeight: 600 }}>Progress</div>
           <div style={{ marginTop: 6, color: "#333" }}>
             {status === "idle" && "Idle"}
-            {status === "analyzing" && "Analyzing"}
-            {status === "documents" && "Documents"}
-            {status === "quiz" && "Quiz"}
-            {status === "manifest" && "Manifest"}
-            {status === "deploy" && "Deploy"}
-            {status === "done" && "Done"}
+            {status === "generating" && "Generating JSON"}
+            {status === "validating" && "Running validation"}
+            {status === "ready" && "Generation complete"}
+            {status === "downloading" && "Building ZIP"}
             {status === "error" && "Error"}
           </div>
         </div>
@@ -123,17 +138,54 @@ export default function HomePage() {
         {result?.ok && (
           <div style={{ display: "grid", gap: 12 }}>
             <div style={{ padding: 12, border: "1px solid #eee", borderRadius: 8 }}>
-              <div style={{ fontWeight: 600 }}>Manifest URL</div>
-              <div style={{ marginTop: 6, wordBreak: "break-all" }}>{result.manifestUrl}</div>
-              <div style={{ marginTop: 6, color: "#555" }}>
-                Deploy: {result.deploy.attempted ? (result.deploy.ok ? "OK" : "Failed") : "Skipped"} (
-                {result.deploy.message})
+              <div style={{ fontWeight: 600 }}>Generation Complete</div>
+              <div style={{ marginTop: 6, color: "#333" }}>Documents: {result.documents.length}</div>
+              <div style={{ marginTop: 4, color: "#333" }}>Quizzes: {result.quizzes.length}</div>
+              <div style={{ marginTop: 4, color: result.validation.passed ? "#116611" : "#a00" }}>
+                Validation: {result.validation.passed ? "Passed" : "Failed"}
               </div>
             </div>
 
-            <div style={{ display: "grid", gap: 8, justifyItems: "start" }}>
-              <div style={{ fontWeight: 600 }}>Scan to import into SokQA</div>
-              <QRCodeCanvas value={result.manifestUrl} size={220} />
+            <div style={{ padding: 12, border: "1px solid #eee", borderRadius: 8 }}>
+              <div style={{ fontWeight: 600 }}>Validation Result</div>
+              <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+                {result.validation.checks.map((check) => (
+                  <div
+                    key={check.name}
+                    style={{
+                      padding: "8px 10px",
+                      borderRadius: 6,
+                      background: check.passed ? "#f2fbf2" : "#fff5f5",
+                      color: check.passed ? "#116611" : "#a00",
+                    }}
+                  >
+                    {check.name}: {check.message}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ padding: 12, border: "1px solid #eee", borderRadius: 8 }}>
+              <div style={{ fontWeight: 600 }}>ZIP Package</div>
+              <div style={{ marginTop: 6, color: "#555" }}>
+                Files: metadata.json, {result.metadata.documents.join(", ")}, {result.metadata.quizzes.join(", ")}
+              </div>
+              <button
+                onClick={onDownloadZip}
+                disabled={!result.validation.passed || status === "downloading"}
+                style={{
+                  marginTop: 12,
+                  padding: "10px 14px",
+                  borderRadius: 8,
+                  border: "1px solid #111",
+                  background: result.validation.passed && status !== "downloading" ? "#111" : "#777",
+                  color: "#fff",
+                  cursor: result.validation.passed && status !== "downloading" ? "pointer" : "not-allowed",
+                  width: 220,
+                }}
+              >
+                Download Learning Pack
+              </button>
             </div>
           </div>
         )}

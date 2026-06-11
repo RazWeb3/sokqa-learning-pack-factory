@@ -1,84 +1,47 @@
 ---
 name: "sokqa-json-shape-tts-validator"
-description: "SokQAのdocument/quiz/manifest JSONを厳密に検証し、TTS規約もチェックする。生成後の検証や不具合調査で呼び出す。"
+description: "document/quiz/metadata JSON を検証し、manifest は optional として扱う。TTS は存在と型のみ確認する。"
 ---
 
 # SokQA JSON / TTS Validator
 
 ## 目的
 
-- 生成した `document` / `quiz` / `pack_manifest` が “そのままSokQAにインポート可能” かを機械的に検証する。
-- 失敗したら再生成（最大3回）するためのチェック項目を定義する。
+- 生成した `document` / `quiz` / `metadata` が再利用可能な learning pack として成立するかを検証する。
+- 失敗時の再生成判断を明確にする。
 
-## 必須スキーマ（フィールド名・ネスト・ID形式）
+## 必須検証対象
 
-### Document（type: "document"）
+- `document`
+- `quiz`
+- `metadata`
 
-- top:
-  - `id` string
-  - `type` === `"document"`
-  - `schemaVersion` === 1
-  - `title` string
-  - `description` string
-  - `language` === `"en"`
-  - `globalTags` string[]
-  - `documents` array
-- documents[i]:
-  - `id` 例: `"doc-1"`, `"doc-2"`…
-  - `text` string
-  - `tts.text` string
+optional:
 
-### Quiz（type: "quiz"）
+- `manifest`
 
-- top:
-  - `id` string
-  - `type` === `"quiz"`
-  - `schemaVersion` === 1
-  - `title` string
-  - `description` string
-  - `language` === `"en"`
-  - `globalTags` string[]
-  - `questions` array（DEMOは “5問ちょうど”）
-- questions[i]:
-  - `id` 例: `"q-1"`, `"q-2"`…
-  - `question` string
-  - `choices` string[]（長さ4ちょうど）
-  - `answerIndex` number（0–3）
-  - `explanation` string
-  - `tts.questionText` string
-  - `tts.choicesText` string
-  - `tts.answerText` string
-  - `tts.explanationText` string
+## 必須チェック
 
-### Manifest（type: "pack_manifest"）
+- `JSON.parse`
+- 型チェック
+- 存在チェック
+- `choices.length === 4`
+- `answerIndex` が `0-3`
+- `metadata.documents` と document 出力数の整合性
+- `metadata.quizzes` と quiz 出力数の整合性
 
-- top:
-  - `id` string
-  - `type` === `"pack_manifest"`
-  - `schemaVersion` === 1
-  - `title` string
-  - `globalTags` string[]
-  - `description` string
-  - `language` string（デモ仕様では `en` を推奨。既存サンプルは `ja` の可能性あり）
-  - `author` === `"Sokqa Team"`
-  - `items` array
-- items[i]:
-  - `kind` === `"document"` | `"quiz"`
-  - `url` string（フルの `https://...`）
+## TTS の扱い
 
-## TTS規約（壊れると品質が落ちるので検出）
+- `tts` フィールドは保持する
+- 音声ファイルは生成しない
+- 音声品質は検証しない
+- `tts` の型と存在のみ確認する
 
-- 区切りはピリオド禁止、カンマ `,` を使う（文字列末尾も `,` で終える）。
-- 日本語は `[ja-JP]` で開始し、文末は全角 `、` を推奨（サンプル準拠）。
-- 英語に戻すときは `[en-US]`。
-- quiz:
-  - `tts.choicesText` は `Number 1, <c1>, Number 2, <c2>, Number 3, <c3>, Number 4, <c4>,`
-  - `tts.answerText` は `The correct answer is Number X, <correct choice>,`
+## 再生成トリガー
 
-## 典型的な失敗パターン（再生成トリガー）
-
-- JSONとして壊れている（末尾カンマ/引用符/エスケープ）。
-- `choices` が4つではない、`answerIndex` が範囲外。
-- `tts.*` が欠落、末尾が `,` で終わっていない。
-- `items[].url` が https で始まらない、またはバッククォート等の余計な文字が含まれる。
+- JSONとして壊れている
+- `choices` が4件ではない
+- `answerIndex` が範囲外
+- `tts` が欠落している
+- metadata のファイル一覧が生成物と一致しない
 

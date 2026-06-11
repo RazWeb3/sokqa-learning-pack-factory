@@ -1,36 +1,36 @@
 ---
 name: "nextjs-sokqa-pack-api"
-description: "Next.js App RouterでSokQA pack生成→publicへ書き出し→静的配信する手順。生成ルートやファイル出力/URL組立で迷ったときに呼び出す。"
+description: "Next.js App Routerで learning pack の JSON生成と validation 結果返却を行い、ZIPはクライアント側で組み立てる手順。"
 ---
 
-# Next.js SokQA Pack（静的ファイル方式）
+# Next.js Learning Pack API
 
 ## ゴール
 
-- 生成した `manifest.json / doc_01.json / quiz_01.json` を `public/generated-pack/<packId>/` に書き出す。
-- デプロイ後は `https://<domain>/generated-pack/<packId>/manifest.json` をQR化してSokQAにインポートする。
+- `POST /api/generate` で `document`, `quiz`, `metadata`, `validation` を返す。
+- ZIP生成はブラウザ側の `JSZip` に任せる。
 
-## ルート構成（最小・生成のみ）
+## ルート構成
 
-- `POST /api/generate`（ローカル実行想定）
-  - 入力: Textareaの生テキスト（日本語可）
-  - 出力: `{ packId, manifestUrl }`
-  - 内部で Analyzer → Pack Builder（docs+quiz）→ Publisher（ファイル書き出し+manifest生成）
+- `POST /api/generate`
+  - 入力: `{ text }`
+  - 出力: `{ documents, quizzes, metadata, validation }`
+  - 内部フロー: Analyzer -> Pack Builder -> Validator
 
-## 書き出し先（DEMO）
+## 実装しないもの
 
-- `public/generated-pack/<packId>/`
-  - `manifest.json`
-  - `doc_01.json`（必要なら `doc_02.json`）
-  - `quiz_01.json`（5問ちょうど）
+- `public/generated-pack/` への書き出し
+- manifest URL の生成
+- `BASE_URL`
+- `vercel --prod`
+- `/api/export-zip`
+- `/api/download/*`
+- 一時保存
+- TTL管理
 
-## URL組み立て（固定本番ドメイン）
+## クライアント側エクスポート
 
-- `BASE_URL` は `https://pe-gules.vercel.app` を固定で使う（プレビューURL不使用）。
-- manifest の `items[].url` は:
-  - `${BASE_URL}/generated-pack/${packId}/doc_01.json`
-  - `${BASE_URL}/generated-pack/${packId}/quiz_01.json`
-
-## デプロイ（任意）
-
-- 書き出し後に `vercel --prod` を実行して本番URLを更新する（CLI/スクリプト）。
+- `metadata.json`
+- `doc_01.json`
+- `quiz_01.json`
+- `learning-pack.zip`

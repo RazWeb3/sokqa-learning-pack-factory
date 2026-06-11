@@ -1,194 +1,329 @@
 ---
-title: SokQA Learning Pack Factory（Trae SOLO Implementation Spec v3 / 静的ファイル方式）
+title: SokQA Learning Pack Factory OSS Edition Spec v0.2
 ---
 
-# SokQA Learning Pack Factory
+# Learning Pack Generator OSS
 
-マニュアルのテキストから、SokQAにそのままインポートできる学習パック（manifest + docs + quiz）のJSONファイル群を生成し、Vercelに静的配信する。manifest URLをQRコードで表示してインポートする。
+マニュアルやドキュメントのテキストから、再利用可能な学習パックJSONを生成し、検証し、ZIPとしてダウンロード可能にする。
 
-## デモの最優先ゴール（Phase 1）
+## 成功指標
 
+旧:
+
+```text
+SokQA Import Success
 ```
-Text Paste → Generate JSON files → write to public/ → vercel --prod → 固定URL → QR → SokQA Import success
+
+新:
+
+```text
+Generate -> Validate -> Download ZIP
 ```
 
-- 成功指標は “SokQA Import success”
-- 配信用の動的API・in-memory・CORS自前実装は使わない（静的配信に寄せる）
+## プロダクト定義
 
-## なぜ静的ファイル方式か（設計の前提）
+旧:
 
-- 生成したJSONを Next.js の `public/generated-pack/<packId>/` に書き出し、`vercel --prod` でデプロイする。
-- Vercelの静的配信はデフォルトで誰でもfetch可能 → CORS実装が不要。
-- 一度デプロイすれば確実に永続配信 → 何度スキャンしても確実に読める（インスタンス依存なし）。
-- 既存Convlyサンプル（manifestがフルURLでdoc/quizを指す）と同じ構造を再現できる。
+```text
+Paste a manual and automatically generate a SokQA-ready learning pack.
+```
 
-## 本番ドメインの扱い（重要）
+新:
 
-- manifestの `items[].url` はデプロイ先ドメインを含むフルURLにする。
-- プレビューごとに変わるランダムURLではなく、プロジェクトの固定本番ドメイン（`https://<project-name>.vercel.app`）を使う（`vercel --prod` で反映）。
-- デモ前に一度デプロイしてドメインを確定させ、`BASE_URL` に入れておく。
+```text
+Paste a manual and automatically generate reusable learning packs that can be downloaded and shared as ZIP files.
+```
+
+## 固定スコープ
+
+- `npm install` でセットアップできる
+- `npm run dev` でローカル起動できる
+- テキストから `document JSON` を生成する
+- テキストから `quiz JSON` を生成する
+- `metadata.json` を生成する
+- 生成結果を検証する
+- ブラウザ側で `JSZip` を使って `learning-pack.zip` を生成する
+- ZIP をダウンロードできる
+
+## 必須ではないもの
+
+以下は必須経路から除外する。
+
+- `vercel --prod`
+- `public/generated-pack/`
+- QR code generation
+- manifest URL generation
+- fixed production domain
+- `BASE_URL`
+- SokQA import
+
+将来機能として残す場合は Feature Flag 化する。
 
 例:
 
-```ts
-const BASE_URL = "https://pe-gules.vercel.app"
+```text
+ENABLE_MANIFEST_EXPORT=false
 ```
 
-## 当日の進め方（二段構え）
+## 出力物
 
-- メイン（①ライブ生成）: デモ前に一度デプロイ→本番ドメイン確定 → 当日テキスト貼り付け→生成→書き出し→`vercel --prod`→QR→インポート。
-- フォールバック（②事前生成）: デモ用パックを1セット事前生成・デプロイ済みにしておき、QR表示とインポートだけは確実に見せられる状態にしておく。
+ZIPファイル名:
 
-## 固定スタック
-
-- Next.js（App Router）+ TypeScript
-- Vercel（静的配信。`public/generated-pack/` にJSONを書き出す）
-- QR: `qrcode.react`
-- LLM: 各agent stepごとにAPI呼び出し
-
-## 生成物（DEMO）
-
-`public/generated-pack/<packId>/` に書き出し:
-
-```
-manifest.json
-doc_01.json     （1–2本）
-quiz_01.json    （1本、5問ちょうど）
+```text
+learning-pack.zip
 ```
 
-配信URL（デプロイ後）:
+ZIP内容:
 
+```text
+metadata.json
+doc_01.json
+quiz_01.json
 ```
-https://<domain>/generated-pack/<packId>/manifest.json
-https://<domain>/generated-pack/<packId>/doc_01.json
-https://<domain>/generated-pack/<packId>/quiz_01.json
-```
 
-## スキーマ（これ以外を作らない）
+`metadata.json` を manifest の代替として使う。外部URLは含めない。
 
-### A. document（type: "document"）
-
-- top: `id`, `type`, `schemaVersion`, `title`, `description`, `language`, `globalTags`, `documents`
-- item: `id`（`doc-1`..）, `text`, `tts.text`
-
-最小例:
+例:
 
 ```json
 {
-  "id": "pack_x_doc_01",
-  "type": "document",
-  "schemaVersion": 1,
-  "title": "Title",
-  "description": "Desc",
-  "language": "en",
-  "globalTags": ["tag"],
-  "documents": [
-    { "id": "doc-1", "text": "Hello", "tts": { "text": "[en-US]Hello," } }
-  ]
+  "id": "pack_20260611_001",
+  "title": "Customer Service Training",
+  "description": "Generated learning pack",
+  "createdAt": "2026-06-11T00:00:00Z",
+  "generator": "sokqa-learning-pack-factory",
+  "version": "0.2.0",
+  "documents": ["doc_01.json"],
+  "quizzes": ["quiz_01.json"]
 }
 ```
 
-### B. quiz（type: "quiz"）
+## API
 
-- top: `id`, `type`, `schemaVersion`, `title`, `description`, `language`, `globalTags`, `questions`
-- item: `id`（`q-1`..）, `question`, `choices`（4つ固定）, `answerIndex`（0–3）, `explanation`,
-  `tts.questionText`, `tts.choicesText`, `tts.answerText`, `tts.explanationText`
+`POST /api/generate`
 
-### C. manifest（type: "pack_manifest"）
+入力:
 
-- top: `id`, `type`, `schemaVersion`, `title`, `globalTags`, `description`, `language`, `author`, `items`
-- items: `{ kind: "document"|"quiz", url: "https://..." }`
+```json
+{
+  "text": "..."
+}
+```
 
-注意:
+戻り値:
 
-- `url` は “余計な文字なしのプレーンな文字列” にする（バッククォートや空白を入れない）。
-- `url` はフルの `https://...`（相対パス不可）。`BASE_URL + "/generated-pack/<packId>/<file>"` で組み立てる。
-
-## TTS規約（厳守）
-
-1. 区切りはカンマ `,`（ピリオド禁止）。末尾も必ず `,`
-2. 日本語は `[ja-JP]`、英語に戻すときは `[en-US]`
-3. 日本語部分は全角 `、` を使う（サンプル準拠）
-4. `tts.choicesText`（quiz）:
-   - `Number 1, <c1>, Number 2, <c2>, Number 3, <c3>, Number 4, <c4>,`
-5. `tts.answerText`（quiz）:
-   - `The correct answer is Number X, <correct choice>,`
-
-## 学習コンテンツの作り方（Listening Packの型）
-
-各 document は、この流れを必ず含める（ジェネリックは禁止）:
-
-1. Introduction（何を学ぶか）
-2. Explanation（やさしい英語で説明）
-3. Phrase Practice（丁寧/カジュアル、使う場面）
-4. Mini Conversation（短い現場会話）
-5. Review（復習・励まし）
+```json
+{
+  "documents": [],
+  "quizzes": [],
+  "metadata": {},
+  "validation": {}
+}
+```
 
 ルール:
 
-- `language` は全ファイル `"en"` 固定
-- TTS内で `[ja-JP]` の日本語フレーズを挟む（日本語だけの教材にしない）
+- ZIP生成はサーバー側で行わない
+- `/api/export-zip` は実装しない
+- `/api/download/*` は実装しない
+- 一時保存機構は実装しない
+- TTL管理は実装しない
+- ブラウザ側で `JSZip` を使って ZIP を組み立てる
 
-## Agentワークフロー（見せ方は4-agent / 実装は最小）
+## UI
 
-公開上は:
+旧:
 
-- Agent 1: Analyzer
-- Agent 2: Pack Builder
-- Agent 3: Quiz（見せ方）
-- Agent 4: Publisher
-
-実装はLLM呼び出しを減らすため:
-
-- Analyzer（LLM 1回）
-- Pack Builder（docs + quizを生成、quizは1問ずつで5問固定）
-- Publisher（ファイル書き出し + manifest生成、LLM不要）
-
-### Analyzerの出力（JSONのみ）
-
-```json
-{
-  "training_topic": "",
-  "target_role": "",
-  "key_points": [],
-  "service_phrases": [],
-  "important_rules": [],
-  "common_mistakes": []
-}
+```text
+Generate
+-> Manifest URL
+-> QR
 ```
 
-## 書き出し & デプロイ（API配信なし）
+新:
 
-### 書き出し
+```text
+Generate
+-> Validation Result
+-> Download ZIP
+```
 
-- `publishPack` で各JSONを `public/generated-pack/<packId>/<filename>` にファイル書き込みする。
-- `packId` は短いランダム文字列（例: `nanoid` か `Date.now().toString(36)`）。
-- manifestの `items[].url` は `BASE_URL + "/generated-pack/" + packId + "/" + filename`。
+表示要件:
 
-### デプロイ
+```text
+Generation Complete
+Documents: 1
+Quizzes: 1
+Validation: Passed
+[ Download Learning Pack ]
+```
 
-- 書き出し後に `vercel --prod` を実行する（CLI / スクリプトから）。
-- デプロイ完了後、`BASE_URL/generated-pack/<packId>/manifest.json` が有効になる。
+## JSON仕様
 
-### QR表示
+### document
 
-- 結果画面で manifest URL をテキスト表示 + `qrcode.react` でQR表示する。
-- QRに入れるのは manifest URLのみ（pack URLや生JSONを入れない）。
-- ラベル: 「Scan to import into SokQA」
+- `type` は `"document"`
+- `schemaVersion` は `1`
+- `language` は `"en"`
+- `documents[].id` は `doc-N`
+- `documents[].text` を持つ
+- `documents[].tts.text` を持つ
 
-## 生成の安全運用（失敗しやすい点の対策）
+### quiz
 
-- 生成直後に毎回 `JSON.parse` + shape check
-- 失敗したら同じ目的で再生成（最大3回）
-- doc/quizを巨大JSONで一括生成しない:
-  - docはitemを分割生成→連結
-  - quizは “1問ずつ” 生成して5問で停止
+- `type` は `"quiz"`
+- `schemaVersion` は `1`
+- `language` は `"en"`
+- `questions[].id` は `q-N`
+- `choices` は4件固定
+- `answerIndex` は `0` から `3`
+- `tts.questionText`
+- `tts.choicesText`
+- `tts.answerText`
+- `tts.explanationText`
 
-## サーバレス注意（DEMO）
+### metadata
 
-- 本番URLは `vercel --prod` 反映後に安定する。プレビューURLは使わない。
+- `id`
+- `title`
+- `description`
+- `createdAt`
+- `generator`
+- `version`
+- `documents`
+- `quizzes`
 
-## フォールバック（Vercelが不安定な場合）
+## Validator方針
 
-- `convly.jp/sokqa/data/...` に静的配置して `items[].url` をそちらに向ける
-- フォールバック②: デモ用パックを事前生成・デプロイ済みにし、QR表示とインポートだけは確実に見せられる状態を確保する
+必須検証対象:
+
+- document
+- quiz
+- metadata
+
+optional:
+
+- manifest
+
+このOSSでは音声ファイルは生成しない。ただし SokQA 互換維持のため `tts` フィールドは保持する。
+
+validator は以下のみ行う。
+
+- 型チェック
+- 存在チェック
+- `JSON.parse`
+- `choices.length === 4`
+- `answerIndex` の範囲チェック
+- metadata と出力ファイル一覧の整合性チェック
+
+音声品質は検証対象外。
+
+## ワークフロー
+
+維持する skill 名:
+
+- `llm-agents-orchestrator-sokqa`
+- `nextjs-sokqa-pack-api`
+- `sokqa-json-shape-tts-validator`
+- `sokqa-pack-factory-spec`
+
+改名はしない。変更するのは中身のみ。
+
+新しい内部フロー:
+
+```text
+Analyzer
+-> Pack Builder
+-> Validator
+-> Exporter
+```
+
+`Publisher` の CDN / URL 前提は削除する。
+
+## README方針
+
+README から主役を外すもの:
+
+- QR Import
+- Manifest URL
+- Vercel Deploy
+- Static Hosting
+- Production Domain
+- `BASE_URL`
+
+README の主役:
+
+- What it does
+- Document JSON
+- Quiz JSON
+- Metadata JSON
+- ZIP Package
+- Skill Driven Architecture
+
+## ロードマップ
+
+### v0.2
+
+- ZIP Export
+- `metadata.json`
+- Manifest Dependency Removal
+
+### v0.3
+
+- Multiple Documents
+- Multiple Quiz Packs
+
+### v0.4
+
+- Base64 Compressed Import URL Export
+
+### v0.5
+
+- PDF Export with Import URL
+
+### v0.6
+
+- Optional SokQA Manifest Export
+- Optional CDN Export
+
+## テスト
+
+最低限追加する。
+
+- Smoke Test: Generate -> Validate -> ZIP Download
+- Validator Test: `JSON.parse`
+- Validator Test: `choices length = 4`
+- Validator Test: `answerIndex range`
+- Validator Test: `metadata consistency`
+
+## 完了条件
+
+- `npm install` で起動準備できる
+- `npm run dev` で動作する
+- テキストから `document JSON` を生成できる
+- `quiz JSON` を生成できる
+- `metadata.json` を生成できる
+- Validation を実行できる
+- `JSZip` で ZIP を生成できる
+- ZIP をダウンロードできる
+- `README.md` 更新完了
+- `.trae/skills` 更新完了
+- Manifest / QR / Vercel が必須経路から除外されている
+- スモークテスト成功
+
+## 非目標
+
+今回実施しない。
+
+- SokQA Studio改修
+- CDN構築
+- QR最適化
+- Base64圧縮改善
+- PDF生成
+- SaaS化
+- 認証
+- ユーザー管理
+
+## 最終目標
+
+誰でもローカルで実行し、学習パックを生成してZIPで共有できるOSSを完成させる。

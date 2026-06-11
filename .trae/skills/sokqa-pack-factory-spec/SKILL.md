@@ -5,31 +5,35 @@ description: "SokQA Learning Pack Factoryの仕様と優先順位を要約する
 
 # SokQA Pack Factory Spec
 
-## 目的（デモのゴール）
+## 目的
 
-- 画面に手順: Text paste → Generate JSON files → write to public/ → vercel --prod → 固定URL → QR → SokQA Import success
-- “SokQA Import success” が成功指標。動的API/in-memory/CORS自前実装は使わない（静的配信）。
+- `Generate -> Validate -> Download ZIP` を成立させる
+- 誰でもローカルで learning pack を生成し、ZIP 共有できる OSS にする
 
 ## 固定スタック
 
 - Next.js（App Router）+ TypeScript
-- Vercel（静的配信。生成JSONは `public/generated-pack/` に書き出す）
-- QR: `qrcode.react`
+- JSZip
+- Vitest
 
-## 生成物（DEMO）
+## 生成物
 
-- `/generated-pack/<packId>/manifest.json`
-- `/generated-pack/<packId>/doc_01.json`（1–2本）
-- `/generated-pack/<packId>/quiz_01.json`（5問ちょうど）
+- `metadata.json`
+- `doc_01.json`
+- `quiz_01.json`
+- `learning-pack.zip`
 
 ## 重要制約
 
-- SokQA既存スキーマのみ（document / quiz / pack_manifest）。カスタムスキーマ禁止。
-- 生成JSONは `JSON.parse` と shape check に通す。失敗時は最大3回まで再生成。
-- 大きいJSONを一気に生成しない（小さく分割して結合）。
-- `language: "en"` 固定（TTS内で `[ja-JP]` と `[en-US]` を切り替える）。
+- `document`, `quiz`, `metadata` を必須にする
+- ZIP はクライアント側で生成する
+- `manifest`, QR, Vercel, `BASE_URL` を必須経路から外す
+- `language: "en"` 固定
+- `tts` フィールドは保持する
 
-## デプロイの前提
+## API
 
-- manifestの `items[].url` はフルの `https://<domain>/generated-pack/<packId>/<file>` にする。
-- 本番ドメインは事前に確定させ、`BASE_URL` として固定する（プレビューURL不使用）。
+- `POST /api/generate`
+- 戻り値: `{ documents, quizzes, metadata, validation }`
+- `/api/export-zip` は作らない
+- `/api/download/*` は作らない

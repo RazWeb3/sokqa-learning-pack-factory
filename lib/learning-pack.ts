@@ -1,0 +1,460 @@
+import { nanoid } from "nanoid"
+
+export type AnalyzerResult = {
+  trainingTopic: string
+  targetRole: string
+  keyPoints: string[]
+  servicePhrases: string[]
+  importantRules: string[]
+  commonMistakes: string[]
+}
+
+export type DocumentFile = {
+  id: string
+  type: "document"
+  schemaVersion: 1
+  title: string
+  description: string
+  language: "en"
+  globalTags: string[]
+  documents: Array<{ id: string; text: string; tts: { text: string } }>
+}
+
+export type QuizFile = {
+  id: string
+  type: "quiz"
+  schemaVersion: 1
+  title: string
+  description: string
+  language: "en"
+  globalTags: string[]
+  questions: Array<{
+    id: string
+    question: string
+    choices: [string, string, string, string]
+    answerIndex: 0 | 1 | 2 | 3
+    explanation: string
+    tts: {
+      questionText: string
+      choicesText: string
+      answerText: string
+      explanationText: string
+    }
+  }>
+}
+
+export type MetadataFile = {
+  id: string
+  title: string
+  description: string
+  createdAt: string
+  generator: "sokqa-learning-pack-factory"
+  version: "0.2.0"
+  documents: string[]
+  quizzes: string[]
+}
+
+export type ValidationCheck = {
+  name: string
+  passed: boolean
+  message: string
+}
+
+export type ValidationResult = {
+  passed: boolean
+  checks: ValidationCheck[]
+  errors: string[]
+}
+
+export type LearningPack = {
+  documents: DocumentFile[]
+  quizzes: QuizFile[]
+  metadata: MetadataFile
+  validation: ValidationResult
+}
+
+type PackPayload = Omit<LearningPack, "validation">
+
+function ensureEndsWithComma(text: string) {
+  const trimmed = text.trim()
+  return trimmed.endsWith(",") ? trimmed : `${trimmed},`
+}
+
+function toJaTts(text: string) {
+  const trimmed = text.trim().replace(/[、,]+$/g, "")
+  return `[ja-JP]${trimmed}、`
+}
+
+function toEnTts(text: string) {
+  const trimmed = text.trim().replace(/,+$/g, "")
+  return `[en-US]${trimmed},`
+}
+
+function choicesTts(choices: [string, string, string, string]) {
+  return ensureEndsWithComma(
+    `[en-US]Number 1, ${choices[0]}, Number 2, ${choices[1]}, Number 3, ${choices[2]}, Number 4, ${choices[3]},`,
+  )
+}
+
+function answerTts(answerNumber: 1 | 2 | 3 | 4, choiceText: string) {
+  return ensureEndsWithComma(`[en-US]The correct answer is Number ${answerNumber}, ${choiceText},`)
+}
+
+function extractServicePhrases(text: string) {
+  const lines = text
+    .split(/\r?\n/g)
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  const phrases = new Set<string>()
+  for (const line of lines) {
+    if (/[ぁ-んァ-ン一-龯]/.test(line) && line.length <= 24) {
+      phrases.add(line.replace(/[。．.！!？?]+$/g, ""))
+    }
+  }
+
+  const defaults = [
+    "お疲れ様です",
+    "いらっしゃいませ",
+    "ありがとうございます",
+    "少々お待ちください",
+    "申し訳ございません",
+  ]
+
+  const merged = [...phrases].filter((phrase) => phrase.length >= 2 && phrase.length <= 24)
+  for (const fallback of defaults) {
+    if (merged.length >= 5) {
+      break
+    }
+    if (!merged.includes(fallback)) {
+      merged.push(fallback)
+    }
+  }
+
+  return merged.slice(0, 5)
+}
+
+export function analyzeManualText(text: string): AnalyzerResult {
+  return {
+    trainingTopic: "Customer Service Basics",
+    targetRole: "Frontline staff (beginner)",
+    keyPoints: [
+      "Use polite greetings and polite requests",
+      "Repeat and confirm key information",
+      "Ask for help early when you are not sure",
+    ],
+    servicePhrases: extractServicePhrases(text),
+    importantRules: ["Be polite", "Be clear", "Stay calm"],
+    commonMistakes: ["Too casual speech", "Not confirming numbers", "Not asking for help"],
+  }
+}
+
+export function buildDocumentFile(packId: string, analyzer: AnalyzerResult): DocumentFile {
+  const primaryPhrase = analyzer.servicePhrases[0] ?? "お疲れ様です"
+
+  return {
+    id: `${packId}_doc_01`,
+    type: "document",
+    schemaVersion: 1,
+    title: "Workplace Listening Pack: Polite Phrase Practice",
+    description: "A reusable listening pack for polite workplace phrase practice.",
+    language: "en",
+    globalTags: ["workplace", "beginner", "listening"],
+    documents: [
+      {
+        id: "doc-1",
+        text: "Introduction. This pack helps you practice polite workplace language through listening.",
+        tts: { text: ensureEndsWithComma("Introduction, This pack helps you practice polite workplace language through listening,") },
+      },
+      {
+        id: "doc-2",
+        text: "Explanation. Polite phrases help you sound professional and build trust with coworkers and customers.",
+        tts: {
+          text: ensureEndsWithComma(
+            "Explanation, Polite phrases help you sound professional and build trust with coworkers and customers,",
+          ),
+        },
+      },
+      {
+        id: "doc-3",
+        text: `Phrase Practice. Today's phrase is ${primaryPhrase}. Listen and repeat.`,
+        tts: {
+          text: ensureEndsWithComma(`Phrase Practice, Today's phrase is ${toJaTts(primaryPhrase)}${toEnTts("Listen and repeat")}`),
+        },
+      },
+      {
+        id: "doc-4",
+        text: "Phrase Practice. Say it slowly first, then use a natural speed.",
+        tts: { text: ensureEndsWithComma("Phrase Practice, Say it slowly first, then use a natural speed,") },
+      },
+      {
+        id: "doc-5",
+        text: `Mini Conversation. Coworker: ${primaryPhrase}. You: ${primaryPhrase}.`,
+        tts: {
+          text: ensureEndsWithComma(`Mini Conversation, Coworker, ${toJaTts(primaryPhrase)}${toEnTts("You")}${toJaTts(primaryPhrase)}`),
+        },
+      },
+      {
+        id: "doc-6",
+        text: "Review. This phrase signals politeness, respect, and teamwork.",
+        tts: { text: ensureEndsWithComma("Review, This phrase signals politeness, respect, and teamwork,") },
+      },
+    ],
+  }
+}
+
+export function buildQuizFile(packId: string, analyzer: AnalyzerResult): QuizFile {
+  const phrases = analyzer.servicePhrases.length > 0 ? analyzer.servicePhrases : ["お疲れ様です"]
+  const questions: QuizFile["questions"] = Array.from({ length: 5 }, (_, index) => {
+    const phrase = phrases[index % phrases.length]
+    const choices: [string, string, string, string] = [
+      "Thank you",
+      "Excuse me / Sorry",
+      "A polite workplace greeting",
+      "Good night",
+    ]
+
+    return {
+      id: `q-${index + 1}`,
+      question: `What does ${phrase} mean in a workplace context?`,
+      choices,
+      answerIndex: 2,
+      explanation: "This phrase works as a polite workplace greeting and shows respect.",
+      tts: {
+        questionText: ensureEndsWithComma(`[en-US]What does ${toJaTts(phrase)}${toEnTts("mean in a workplace context")}`),
+        choicesText: choicesTts(choices),
+        answerText: answerTts(3, choices[2]),
+        explanationText: ensureEndsWithComma(
+          "[en-US]This phrase works as a polite workplace greeting and shows respect,",
+        ),
+      },
+    }
+  })
+
+  return {
+    id: `${packId}_quiz_01`,
+    type: "quiz",
+    schemaVersion: 1,
+    title: "Workplace Listening Quiz: Meaning Check",
+    description: "A reusable 5-question quiz for workplace phrase understanding.",
+    language: "en",
+    globalTags: ["workplace", "beginner", "quiz"],
+    questions,
+  }
+}
+
+export function buildMetadataFile(packId: string, documents: DocumentFile[], quizzes: QuizFile[]): MetadataFile {
+  return {
+    id: packId,
+    title: "Customer Service Training",
+    description: "Generated learning pack",
+    createdAt: new Date().toISOString(),
+    generator: "sokqa-learning-pack-factory",
+    version: "0.2.0",
+    documents: documents.map((_, index) => `doc_${String(index + 1).padStart(2, "0")}.json`),
+    quizzes: quizzes.map((_, index) => `quiz_${String(index + 1).padStart(2, "0")}.json`),
+  }
+}
+
+function isPlainText(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0
+}
+
+function runValidation(name: string, validator: () => void): ValidationCheck {
+  try {
+    validator()
+    return { name, passed: true, message: "Passed" }
+  } catch (error) {
+    return {
+      name,
+      passed: false,
+      message: error instanceof Error ? error.message : `${error}`,
+    }
+  }
+}
+
+function validateDocument(document: DocumentFile) {
+  if (document.type !== "document") {
+    throw new Error("document.type must be 'document'")
+  }
+  if (document.schemaVersion !== 1) {
+    throw new Error("document.schemaVersion must be 1")
+  }
+  if (document.language !== "en") {
+    throw new Error("document.language must be 'en'")
+  }
+  if (!Array.isArray(document.documents) || document.documents.length < 1) {
+    throw new Error("document.documents must contain at least one item")
+  }
+  for (const item of document.documents) {
+    if (!/^doc-\d+$/.test(item.id)) {
+      throw new Error(`invalid document item id: ${item.id}`)
+    }
+    if (!isPlainText(item.text)) {
+      throw new Error(`document text is required: ${item.id}`)
+    }
+    if (!isPlainText(item.tts?.text)) {
+      throw new Error(`document tts.text is required: ${item.id}`)
+    }
+  }
+}
+
+function validateQuiz(quiz: QuizFile) {
+  if (quiz.type !== "quiz") {
+    throw new Error("quiz.type must be 'quiz'")
+  }
+  if (quiz.schemaVersion !== 1) {
+    throw new Error("quiz.schemaVersion must be 1")
+  }
+  if (quiz.language !== "en") {
+    throw new Error("quiz.language must be 'en'")
+  }
+  if (!Array.isArray(quiz.questions) || quiz.questions.length !== 5) {
+    throw new Error("quiz.questions must contain exactly 5 items")
+  }
+  for (const question of quiz.questions) {
+    if (!/^q-\d+$/.test(question.id)) {
+      throw new Error(`invalid quiz question id: ${question.id}`)
+    }
+    if (!isPlainText(question.question)) {
+      throw new Error(`quiz question is required: ${question.id}`)
+    }
+    if (!Array.isArray(question.choices) || question.choices.length !== 4) {
+      throw new Error(`quiz choices must contain exactly 4 items: ${question.id}`)
+    }
+    if (![0, 1, 2, 3].includes(question.answerIndex)) {
+      throw new Error(`quiz answerIndex must be between 0 and 3: ${question.id}`)
+    }
+    if (!isPlainText(question.explanation)) {
+      throw new Error(`quiz explanation is required: ${question.id}`)
+    }
+    if (!isPlainText(question.tts?.questionText)) {
+      throw new Error(`quiz tts.questionText is required: ${question.id}`)
+    }
+    if (!isPlainText(question.tts?.choicesText)) {
+      throw new Error(`quiz tts.choicesText is required: ${question.id}`)
+    }
+    if (!isPlainText(question.tts?.answerText)) {
+      throw new Error(`quiz tts.answerText is required: ${question.id}`)
+    }
+    if (!isPlainText(question.tts?.explanationText)) {
+      throw new Error(`quiz tts.explanationText is required: ${question.id}`)
+    }
+  }
+}
+
+function validateMetadata(payload: PackPayload) {
+  const { documents, quizzes, metadata } = payload
+
+  if (!isPlainText(metadata.id)) {
+    throw new Error("metadata.id is required")
+  }
+  if (!isPlainText(metadata.title)) {
+    throw new Error("metadata.title is required")
+  }
+  if (!isPlainText(metadata.description)) {
+    throw new Error("metadata.description is required")
+  }
+  if (!isPlainText(metadata.createdAt) || Number.isNaN(Date.parse(metadata.createdAt))) {
+    throw new Error("metadata.createdAt must be a valid ISO date")
+  }
+  if (metadata.generator !== "sokqa-learning-pack-factory") {
+    throw new Error("metadata.generator is invalid")
+  }
+  if (metadata.version !== "0.2.0") {
+    throw new Error("metadata.version is invalid")
+  }
+  if (metadata.documents.length !== documents.length) {
+    throw new Error("metadata.documents count does not match documents")
+  }
+  if (metadata.quizzes.length !== quizzes.length) {
+    throw new Error("metadata.quizzes count does not match quizzes")
+  }
+
+  const expectedDocuments = documents.map((_, index) => `doc_${String(index + 1).padStart(2, "0")}.json`)
+  const expectedQuizzes = quizzes.map((_, index) => `quiz_${String(index + 1).padStart(2, "0")}.json`)
+
+  if (metadata.documents.some((fileName, index) => fileName !== expectedDocuments[index])) {
+    throw new Error("metadata.documents does not match generated files")
+  }
+  if (metadata.quizzes.some((fileName, index) => fileName !== expectedQuizzes[index])) {
+    throw new Error("metadata.quizzes does not match generated files")
+  }
+}
+
+export function validateLearningPack(payload: PackPayload): ValidationResult {
+  const checks = [
+    runValidation("documents-json-parse", () => {
+      for (const document of payload.documents) {
+        JSON.parse(JSON.stringify(document))
+      }
+    }),
+    runValidation("quizzes-json-parse", () => {
+      for (const quiz of payload.quizzes) {
+        JSON.parse(JSON.stringify(quiz))
+      }
+    }),
+    runValidation("metadata-json-parse", () => {
+      JSON.parse(JSON.stringify(payload.metadata))
+    }),
+    runValidation("document-shape", () => {
+      for (const document of payload.documents) {
+        validateDocument(document)
+      }
+    }),
+    runValidation("quiz-shape", () => {
+      for (const quiz of payload.quizzes) {
+        validateQuiz(quiz)
+      }
+    }),
+    runValidation("metadata-consistency", () => {
+      validateMetadata(payload)
+    }),
+  ]
+
+  const errors = checks.filter((check) => !check.passed).map((check) => `${check.name}: ${check.message}`)
+  return {
+    passed: errors.length === 0,
+    checks,
+    errors,
+  }
+}
+
+export function serializeLearningPackFiles(payload: PackPayload) {
+  return [
+    {
+      fileName: "metadata.json",
+      content: JSON.stringify(payload.metadata, null, 2),
+    },
+    ...payload.documents.map((document, index) => ({
+      fileName: `doc_${String(index + 1).padStart(2, "0")}.json`,
+      content: JSON.stringify(document, null, 2),
+    })),
+    ...payload.quizzes.map((quiz, index) => ({
+      fileName: `quiz_${String(index + 1).padStart(2, "0")}.json`,
+      content: JSON.stringify(quiz, null, 2),
+    })),
+  ]
+}
+
+export function generateLearningPack(text: string): LearningPack {
+  const normalized = text.trim()
+  if (!normalized) {
+    throw new Error("text is required")
+  }
+
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "")
+  const packId = `pack_${stamp}_${nanoid(4)}`
+  const analyzer = analyzeManualText(normalized)
+  const documents = [buildDocumentFile(packId, analyzer)]
+  const quizzes = [buildQuizFile(packId, analyzer)]
+  const metadata = buildMetadataFile(packId, documents, quizzes)
+  const validation = validateLearningPack({ documents, quizzes, metadata })
+
+  return {
+    documents,
+    quizzes,
+    metadata,
+    validation,
+  }
+}

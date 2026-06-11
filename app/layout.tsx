@@ -1,8 +1,8 @@
 import type { ReactNode } from "react"
 
 export const metadata = {
-  title: "SokQA Pack Factory",
-  description: "Generate a SokQA learning pack and show a QR code for import.",
+  title: "Learning Pack Generator OSS",
+  description: "Generate reusable learning packs as JSON files and downloadable ZIP packages.",
 }
 
 export default function RootLayout({ children }: { children: ReactNode }) {
