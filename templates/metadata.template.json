@@ -1,0 +1,7 @@
+{
+  "id": "customer-service-pack",
+  "title": "Customer Service Training",
+  "version": "0.2.0",
+  "documents": ["doc_01.json"],
+  "quizzes": ["quiz_01.json"]
+}

@@ -1,23 +1,36 @@
 import JSZip from "jszip"
+import { mkdir, writeFile } from "node:fs/promises"
+import path from "node:path"
 
 import { serializeLearningPackFiles, type LearningPack } from "./learning-pack"
 
-export async function buildLearningPackZipBlob(pack: LearningPack) {
+function buildZip(pack: LearningPack) {
   const zip = new JSZip()
 
   for (const file of serializeLearningPackFiles(pack)) {
     zip.file(file.fileName, file.content)
   }
 
-  return zip.generateAsync({ type: "blob" })
+  return zip
 }
 
 export async function buildLearningPackZipBytes(pack: LearningPack) {
-  const zip = new JSZip()
+  return buildZip(pack).generateAsync({ type: "uint8array" })
+}
+
+export async function writeLearningPackOutput(pack: LearningPack, outputRoot: string) {
+  const packDirectory = path.join(outputRoot, pack.metadata.id)
+  await mkdir(packDirectory, { recursive: true })
 
   for (const file of serializeLearningPackFiles(pack)) {
-    zip.file(file.fileName, file.content)
+    await writeFile(path.join(packDirectory, file.fileName), file.content, "utf8")
   }
 
-  return zip.generateAsync({ type: "uint8array" })
+  const zipBytes = await buildLearningPackZipBytes(pack)
+  await writeFile(path.join(packDirectory, "learning-pack.zip"), zipBytes)
+
+  return {
+    packDirectory,
+    files: ["metadata.json", ...pack.metadata.documents, ...pack.metadata.quizzes, "learning-pack.zip"],
+  }
 }

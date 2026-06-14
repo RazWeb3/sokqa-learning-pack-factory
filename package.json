@@ -1,27 +1,19 @@
 {
   "name": "sokqa-pack-factory",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "test": "vitest run"
+    "generate": "tsx scripts/generate-learning-pack.ts",
+    "generate:example": "tsx scripts/generate-learning-pack.ts --input examples/customer-service.txt --id customer-service-pack --title \"Customer Service Training\"",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "jszip": "^3.10.1",
-    "nanoid": "5.0.7",
-    "next": "14.2.0",
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "@types/node": "20.14.10",
-    "@types/react": "18.2.66",
-    "@types/react-dom": "18.2.22",
-    "eslint": "8.57.0",
-    "eslint-config-next": "14.2.0",
+    "tsx": "^4.20.6",
     "typescript": "5.5.4",
     "vitest": "^3.2.4"
   }

@@ -1,8 +1,11 @@
 import JSZip from "jszip"
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises"
+import os from "node:os"
+import path from "node:path"
 import { describe, expect, it } from "vitest"
 
 import { generateLearningPack, validateLearningPack } from "./learning-pack"
-import { buildLearningPackZipBytes } from "./learning-pack-zip"
+import { buildLearningPackZipBytes, writeLearningPackOutput } from "./learning-pack-zip"
 
 const sampleText = `【例】コンビニ接客の基本
 - お客様に明るくあいさつする
@@ -13,20 +16,34 @@ const sampleText = `【例】コンビニ接客の基本
 
 describe("learning pack", () => {
   it("runs smoke flow from generate to validate to zip", async () => {
-    const pack = generateLearningPack(sampleText)
+    const outputRoot = await mkdtemp(path.join(os.tmpdir(), "sokqa-pack-"))
+    const pack = generateLearningPack({
+      text: sampleText,
+      packId: "customer-service-pack",
+      title: "Customer Service Training",
+    })
 
-    expect(pack.documents).toHaveLength(1)
-    expect(pack.quizzes).toHaveLength(1)
-    expect(pack.validation.passed).toBe(true)
+    try {
+      expect(pack.documents).toHaveLength(1)
+      expect(pack.quizzes).toHaveLength(1)
+      expect(pack.validation.passed).toBe(true)
 
-    const zipBytes = await buildLearningPackZipBytes(pack)
-    const zip = await JSZip.loadAsync(zipBytes)
+      const exportResult = await writeLearningPackOutput(pack, outputRoot)
+      const zipBytes = await buildLearningPackZipBytes(pack)
+      const zip = await JSZip.loadAsync(zipBytes)
 
-    expect(Object.keys(zip.files).sort()).toEqual(["doc_01.json", "metadata.json", "quiz_01.json"])
+      expect(Object.keys(zip.files).sort()).toEqual(["doc_01.json", "metadata.json", "quiz_01.json"])
+      await expect(stat(path.join(exportResult.packDirectory, "learning-pack.zip"))).resolves.toBeDefined()
+      await expect(readFile(path.join(exportResult.packDirectory, "metadata.json"), "utf8")).resolves.toContain(
+        '"id": "customer-service-pack"',
+      )
+    } finally {
+      await rm(outputRoot, { recursive: true, force: true })
+    }
   })
 
   it("fails when quiz choices are not length 4", () => {
-    const pack = generateLearningPack(sampleText)
+    const pack = generateLearningPack({ text: sampleText })
     const invalidPack = structuredClone(pack)
 
     invalidPack.quizzes[0].questions[0].choices = ["A", "B", "C"] as unknown as [string, string, string, string]
@@ -38,7 +55,7 @@ describe("learning pack", () => {
   })
 
   it("fails when answerIndex is out of range", () => {
-    const pack = generateLearningPack(sampleText)
+    const pack = generateLearningPack({ text: sampleText })
     const invalidPack = structuredClone(pack)
 
     invalidPack.quizzes[0].questions[0].answerIndex = 4 as 0
@@ -50,7 +67,7 @@ describe("learning pack", () => {
   })
 
   it("fails when metadata file references do not match generated files", () => {
-    const pack = generateLearningPack(sampleText)
+    const pack = generateLearningPack({ text: sampleText })
     const invalidPack = structuredClone(pack)
 
     invalidPack.metadata.documents = ["doc_99.json"]

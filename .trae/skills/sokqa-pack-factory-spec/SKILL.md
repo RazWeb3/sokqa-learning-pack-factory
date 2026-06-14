@@ -7,12 +7,12 @@ description: "SokQA Learning Pack Factoryの仕様と優先順位を要約する
 
 ## 目的
 
-- `Generate -> Validate -> Download ZIP` を成立させる
-- 誰でもローカルで learning pack を生成し、ZIP 共有できる OSS にする
+- `Generate -> Validate -> ZIP Export -> output/` を成立させる
+- Trae Skills 主導のローカル OSS に再定義する
 
 ## 固定スタック
 
-- Next.js（App Router）+ TypeScript
+- TypeScript
 - JSZip
 - Vitest
 
@@ -26,14 +26,28 @@ description: "SokQA Learning Pack Factoryの仕様と優先順位を要約する
 ## 重要制約
 
 - `document`, `quiz`, `metadata` を必須にする
-- ZIP はクライアント側で生成する
+- ZIP は `output/<pack-id>/learning-pack.zip` として保存する
 - `manifest`, QR, Vercel, `BASE_URL` を必須経路から外す
 - `language: "en"` 固定
 - `tts` フィールドは保持する
+- Web UI は持たない
 
-## API
+## 実行フロー
 
-- `POST /api/generate`
-- 戻り値: `{ documents, quizzes, metadata, validation }`
-- `/api/export-zip` は作らない
-- `/api/download/*` は作らない
+```text
+User
+-> Trae IDE
+-> Skills
+-> Document JSON / Quiz JSON / Metadata JSON
+-> Validator
+-> ZIP Export
+-> output/
+```
+
+## 主要ディレクトリ
+
+- `.trae/skills`
+- `scripts`
+- `examples`
+- `templates`
+- `output`

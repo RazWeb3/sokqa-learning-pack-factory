@@ -1,34 +1,31 @@
 ---
 name: "nextjs-sokqa-pack-api"
-description: "Next.js App Routerで learning pack の JSON生成と validation 結果返却を行い、ZIPはクライアント側で組み立てる手順。"
+description: "Skill名は維持しつつ、現在は scripts ベースで learning pack を生成・検証し、ZIP を output/ へ保存する手順。"
 ---
 
-# Next.js Learning Pack API
+# Local Learning Pack Export Flow
 
 ## ゴール
 
-- `POST /api/generate` で `document`, `quiz`, `metadata`, `validation` を返す。
-- ZIP生成はブラウザ側の `JSZip` に任せる。
+- `document`, `quiz`, `metadata`, `validation` をローカルで生成する。
+- `learning-pack.zip` を `output/<pack-id>/` に保存する。
 
-## ルート構成
+## 実行構成
 
-- `POST /api/generate`
-  - 入力: `{ text }`
-  - 出力: `{ documents, quizzes, metadata, validation }`
-  - 内部フロー: Analyzer -> Pack Builder -> Validator
+- `scripts/generate-learning-pack.ts`
+  - 入力: `--input <file>` または `--text <content>`
+  - 出力: `output/<pack-id>/`
+  - 内部フロー: Analyzer -> Pack Builder -> Validator -> Exporter
 
 ## 実装しないもの
 
-- `public/generated-pack/` への書き出し
 - manifest URL の生成
 - `BASE_URL`
 - `vercel --prod`
-- `/api/export-zip`
-- `/api/download/*`
-- 一時保存
-- TTL管理
+- Next.js API
+- Browser Download UI
 
-## クライアント側エクスポート
+## エクスポート内容
 
 - `metadata.json`
 - `doc_01.json`

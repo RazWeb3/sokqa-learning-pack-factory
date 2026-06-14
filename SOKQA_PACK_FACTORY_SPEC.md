@@ -2,181 +2,120 @@
 title: SokQA Learning Pack Factory OSS Edition Spec v0.2
 ---
 
-# Learning Pack Generator OSS
+# Learning Pack Generator Powered by Trae Skills
 
-マニュアルやドキュメントのテキストから、再利用可能な学習パックJSONを生成し、検証し、ZIPとしてダウンロード可能にする。
+## 背景
 
-## 成功指標
+このプロジェクトの価値は Web UI ではなく、Trae Skills による学習パック生成にある。
 
-旧:
-
-```text
-SokQA Import Success
-```
-
-新:
+旧定義:
 
 ```text
-Generate -> Validate -> Download ZIP
+SokQA Import Tool
 ```
 
-## プロダクト定義
-
-旧:
+新定義:
 
 ```text
-Paste a manual and automatically generate a SokQA-ready learning pack.
+Learning Pack Generator powered by Trae Skills
 ```
 
-新:
+## 目的
+
+ユーザーが Trae IDE 上でテーマや教材を入力し、Trae Skills が以下を実行する。
+
+- 分析
+- 教材生成
+- クイズ生成
+- 検証
+- ZIP Export
+
+## 実行フロー
 
 ```text
-Paste a manual and automatically generate reusable learning packs that can be downloaded and shared as ZIP files.
+User
+-> Trae IDE
+-> Skills
+-> Document JSON
+-> Quiz JSON
+-> Metadata JSON
+-> Validator
+-> ZIP Export
+-> output/
 ```
 
-## 固定スコープ
+## リポジトリ定義
 
-- `npm install` でセットアップできる
-- `npm run dev` でローカル起動できる
-- テキストから `document JSON` を生成する
-- テキストから `quiz JSON` を生成する
-- `metadata.json` を生成する
-- 生成結果を検証する
-- ブラウザ側で `JSZip` を使って `learning-pack.zip` を生成する
-- ZIP をダウンロードできる
+- このリポジトリは Web サービスではない
+- ローカル実行の Skills + scripts ツールである
+- Next.js UI は削除する
+- 生成物は `output/<pack-id>/` に保存する
 
-## 必須ではないもの
-
-以下は必須経路から除外する。
-
-- `vercel --prod`
-- `public/generated-pack/`
-- QR code generation
-- manifest URL generation
-- fixed production domain
-- `BASE_URL`
-- SokQA import
-
-将来機能として残す場合は Feature Flag 化する。
-
-例:
+## 推奨ディレクトリ構成
 
 ```text
-ENABLE_MANIFEST_EXPORT=false
+.trae/
+skills/
+scripts/
+examples/
+templates/
+output/
+README.md
+LICENSE
 ```
 
-## 出力物
+## 生成物
 
-ZIPファイル名:
+必須:
+
+- `metadata.json`
+- `doc_01.json`
+- `quiz_01.json`
+- `learning-pack.zip`
+
+保存先例:
 
 ```text
-learning-pack.zip
+output/customer-service-pack/
+  doc_01.json
+  quiz_01.json
+  metadata.json
+  learning-pack.zip
 ```
 
-ZIP内容:
-
-```text
-metadata.json
-doc_01.json
-quiz_01.json
-```
-
-`metadata.json` を manifest の代替として使う。外部URLは含めない。
+`metadata.json` は manifest の代替であり必須。
 
 例:
 
 ```json
 {
-  "id": "pack_20260611_001",
+  "id": "customer-service-pack",
   "title": "Customer Service Training",
-  "description": "Generated learning pack",
-  "createdAt": "2026-06-11T00:00:00Z",
-  "generator": "sokqa-learning-pack-factory",
   "version": "0.2.0",
   "documents": ["doc_01.json"],
   "quizzes": ["quiz_01.json"]
 }
 ```
 
-## API
-
-`POST /api/generate`
-
-入力:
-
-```json
-{
-  "text": "..."
-}
-```
-
-戻り値:
-
-```json
-{
-  "documents": [],
-  "quizzes": [],
-  "metadata": {},
-  "validation": {}
-}
-```
-
-ルール:
-
-- ZIP生成はサーバー側で行わない
-- `/api/export-zip` は実装しない
-- `/api/download/*` は実装しない
-- 一時保存機構は実装しない
-- TTL管理は実装しない
-- ブラウザ側で `JSZip` を使って ZIP を組み立てる
-
-## UI
-
-旧:
-
-```text
-Generate
--> Manifest URL
--> QR
-```
-
-新:
-
-```text
-Generate
--> Validation Result
--> Download ZIP
-```
-
-表示要件:
-
-```text
-Generation Complete
-Documents: 1
-Quizzes: 1
-Validation: Passed
-[ Download Learning Pack ]
-```
-
 ## JSON仕様
 
 ### document
 
-- `type` は `"document"`
-- `schemaVersion` は `1`
-- `language` は `"en"`
-- `documents[].id` は `doc-N`
+- `type = "document"`
+- `schemaVersion = 1`
+- `language = "en"`
+- `documents[].id = doc-N`
 - `documents[].text` を持つ
 - `documents[].tts.text` を持つ
 
 ### quiz
 
-- `type` は `"quiz"`
-- `schemaVersion` は `1`
-- `language` は `"en"`
-- `questions[].id` は `q-N`
-- `choices` は4件固定
-- `answerIndex` は `0` から `3`
+- `type = "quiz"`
+- `schemaVersion = 1`
+- `language = "en"`
+- `questions[].id = q-N`
+- `choices` は 4 件固定
+- `answerIndex` は `0-3`
 - `tts.questionText`
 - `tts.choicesText`
 - `tts.answerText`
@@ -197,76 +136,80 @@ Validation: Passed
 
 必須検証対象:
 
-- document
-- quiz
-- metadata
+- `document`
+- `quiz`
+- `metadata`
 
-optional:
+Validator が行うこと:
 
-- manifest
-
-このOSSでは音声ファイルは生成しない。ただし SokQA 互換維持のため `tts` フィールドは保持する。
-
-validator は以下のみ行う。
-
+- `JSON.parse`
 - 型チェック
 - 存在チェック
-- `JSON.parse`
 - `choices.length === 4`
-- `answerIndex` の範囲チェック
+- `answerIndex` 範囲チェック
 - metadata と出力ファイル一覧の整合性チェック
 
-音声品質は検証対象外。
+TTS 方針:
 
-## ワークフロー
+- `tts` フィールドは保持する
+- 音声生成はしない
+- 音声品質は検証しない
+- 構造のみ検証する
 
-維持する skill 名:
+## Skill Architecture
 
-- `llm-agents-orchestrator-sokqa`
-- `nextjs-sokqa-pack-api`
-- `sokqa-json-shape-tts-validator`
+維持する Skill 名:
+
 - `sokqa-pack-factory-spec`
+- `llm-agents-orchestrator-sokqa`
+- `sokqa-json-shape-tts-validator`
+- `nextjs-sokqa-pack-api`
 
-改名はしない。変更するのは中身のみ。
+役割:
 
-新しい内部フロー:
-
-```text
-Analyzer
--> Pack Builder
--> Validator
--> Exporter
-```
-
-`Publisher` の CDN / URL 前提は削除する。
+- `sokqa-pack-factory-spec`: 生成ルール定義
+- `llm-agents-orchestrator-sokqa`: Analyzer -> Pack Builder -> Validator -> Exporter
+- `sokqa-json-shape-tts-validator`: JSON / TTS 構造検証
+- `nextjs-sokqa-pack-api`: 名前は維持し、内容は ZIP Export 前提へ更新
 
 ## README方針
 
-README から主役を外すもの:
+削除:
 
-- QR Import
+- Vercel
+- QRコード
 - Manifest URL
-- Vercel Deploy
-- Static Hosting
-- Production Domain
-- `BASE_URL`
+- BASE_URL
+- CDN
 
-README の主役:
+追加:
 
-- What it does
-- Document JSON
-- Quiz JSON
-- Metadata JSON
-- ZIP Package
-- Skill Driven Architecture
+- Trae Skills
+- Local First
+- ZIP Export
+- Examples
+- Templates
+
+## .gitignore
+
+追加対象:
+
+```text
+output/
+*.zip
+.env
+node_modules/
+```
+
+生成物は Git 管理しない。
 
 ## ロードマップ
 
 ### v0.2
 
 - ZIP Export
-- `metadata.json`
-- Manifest Dependency Removal
+- README刷新
+- OSS化
 
 ### v0.3
 
@@ -275,55 +218,46 @@ README の主役:
 
 ### v0.4
 
-- Base64 Compressed Import URL Export
+- Template System
+- Restaurant
+- Hotel
+- Retail
+- IT Training
 
 ### v0.5
 
-- PDF Export with Import URL
+- Validation Improvements
+- Pack Consistency Check
 
 ### v0.6
 
-- Optional SokQA Manifest Export
-- Optional CDN Export
-
-## テスト
-
-最低限追加する。
-
-- Smoke Test: Generate -> Validate -> ZIP Download
-- Validator Test: `JSON.parse`
-- Validator Test: `choices length = 4`
-- Validator Test: `answerIndex range`
-- Validator Test: `metadata consistency`
-
-## 完了条件
-
-- `npm install` で起動準備できる
-- `npm run dev` で動作する
-- テキストから `document JSON` を生成できる
-- `quiz JSON` を生成できる
-- `metadata.json` を生成できる
-- Validation を実行できる
-- `JSZip` で ZIP を生成できる
-- ZIP をダウンロードできる
-- `README.md` 更新完了
-- `.trae/skills` 更新完了
-- Manifest / QR / Vercel が必須経路から除外されている
-- スモークテスト成功
+- CLI Improvements
 
 ## 非目標
 
-今回実施しない。
+実施しない:
 
-- SokQA Studio改修
-- CDN構築
-- QR最適化
-- Base64圧縮改善
-- PDF生成
+- QRコード
+- Manifest URL
+- CDN
+- Vercel Deploy
+- Static Hosting
+- Base64 URL
+- PDF Export
 - SaaS化
-- 認証
-- ユーザー管理
+
+## 完了条件
+
+- Trae Skills のみで生成できる
+- `document JSON` 生成成功
+- `quiz JSON` 生成成功
+- `metadata.json` 生成成功
+- Validation 成功
+- ZIP 出力成功
+- `output/` 保存成功
+- `README.md` 更新完了
+- OSS として公開可能
 
 ## 最終目標
 
-誰でもローカルで実行し、学習パックを生成してZIPで共有できるOSSを完成させる。
+誰でも Trae IDE で利用できる Skill Driven Learning Pack Generator として成立させる。

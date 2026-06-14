@@ -1,75 +1,131 @@
-# Learning Pack Generator OSS
+# Learning Pack Generator Powered by Trae Skills
 
-Paste a manual or document and generate reusable learning packs as JSON files
-and a downloadable ZIP package.
+Local-first generator that uses Trae Skills to produce `document JSON`, `quiz JSON`, `metadata.json`, validate them, and export `learning-pack.zip` into `output/`.
 
-## What It Does
+## Core Idea
 
-- Generates structured learning content from manuals and documents
-- Returns `document JSON`, `quiz JSON`, `metadata JSON`
-- Validates the generated pack before export
-- Builds `learning-pack.zip` in the browser with `JSZip`
+This repository is not a web service.
 
-## Output
-
-- `metadata.json`
-- `doc_01.json`
-- `quiz_01.json`
-- `learning-pack.zip`
-
-## Workflow
+It is a local tool for Trae IDE:
 
 ```text
-Generate -> Validate -> Download ZIP
+User
+-> Trae IDE
+-> Skills
+-> Document JSON / Quiz JSON / Metadata JSON
+-> Validator
+-> ZIP Export
+-> output/
 ```
 
-## Skill Driven Architecture
+## Skill Architecture
 
-This project uses TRAE Skills to define and control the generation workflow.
-The skills are first-class repository assets under `.trae/skills`.
+The main assets live under `.trae/skills`.
 
 - `sokqa-pack-factory-spec`
 - `llm-agents-orchestrator-sokqa`
 - `sokqa-json-shape-tts-validator`
 - `nextjs-sokqa-pack-api`
 
-Internal workflow:
+Runtime flow:
 
 ```text
-Analyzer -> Pack Builder -> Validator -> Exporter
+Specification
+-> Analyzer
+-> Pack Builder
+-> Validator
+-> Exporter
 ```
 
-## Tech Stack
+## Output
 
-- Next.js (App Router) + TypeScript
-- JSZip
-- Vitest
+Generated packs are written to `output/<pack-id>/`.
 
-## Getting Started
+```text
+output/customer-service-pack/
+  metadata.json
+  doc_01.json
+  quiz_01.json
+  learning-pack.zip
+```
 
-1. `npm install`
-2. `npm run dev`
-3. Open [http://localhost:3000](http://localhost:3000)
-4. Paste a manual and click `Generate`
-5. Review the validation result
-6. Click `Download Learning Pack`
+`tts` fields stay in JSON for SokQA compatibility.
+This OSS does not generate audio files.
 
-## Local Validation
+## Directory Layout
 
-- `npm test`
-- `npm run build`
+```text
+.trae/
+skills/
+scripts/
+examples/
+templates/
+output/
+lib/
+README.md
+LICENSE
+```
 
-## Current Scope
+## Setup
 
-- Single document pack
-- Single 5-question quiz pack
-- Client-side ZIP generation
-- `metadata.json` as the pack index
+```bash
+npm install
+```
+
+## Generate
+
+Example run:
+
+```bash
+npm run generate:example
+```
+
+Custom input file:
+
+```bash
+npm run generate -- --input examples/customer-service.txt --id customer-service-pack --title "Customer Service Training"
+```
+
+Direct text input:
+
+```bash
+npm run generate -- --text "Customer service basics..." --id customer-service-pack
+```
+
+## Validation
+
+Run tests:
+
+```bash
+npm test
+```
+
+Run type checks:
+
+```bash
+npm run typecheck
+```
+
+## Included Assets
+
+- `examples/customer-service.txt`
+- `templates/metadata.template.json`
+
+## Non-Goals
+
+- QR codes
+- Manifest URL
+- CDN
+- Vercel deploy
+- Static hosting
+- Base64 URL export
+- PDF export
+- SaaS conversion
 
 ## Roadmap
 
-- `v0.2`: ZIP export, `metadata.json`, manifest dependency removal
+- `v0.2`: ZIP export, README refresh, OSS cleanup
 - `v0.3`: multiple documents, multiple quiz packs
-- `v0.4`: Base64 compressed import URL export
-- `v0.5`: PDF export with import URL
-- `v0.6`: optional SokQA manifest export, optional CDN export
+- `v0.4`: template system for restaurant, hotel, retail, IT training
+- `v0.5`: validation improvements, pack consistency checks
+- `v0.6`: CLI improvements

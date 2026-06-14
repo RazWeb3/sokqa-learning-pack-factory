@@ -29,6 +29,7 @@ optional:
 - `answerIndex` が `0-3`
 - `metadata.documents` と document 出力数の整合性
 - `metadata.quizzes` と quiz 出力数の整合性
+- `metadata.json`, `doc_01.json`, `quiz_01.json` の ZIP 同梱前提を満たすこと
 
 ## TTS の扱い
 
@@ -36,6 +37,7 @@ optional:
 - 音声ファイルは生成しない
 - 音声品質は検証しない
 - `tts` の型と存在のみ確認する
+- 出力先は `output/<pack-id>/` を前提にする
 
 ## 再生成トリガー
 
@@ -44,4 +46,3 @@ optional:
 - `answerIndex` が範囲外
 - `tts` が欠落している
 - metadata のファイル一覧が生成物と一致しない
-
