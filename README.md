@@ -25,7 +25,7 @@ The main assets live under `.trae/skills`.
 - `sokqa-pack-factory-spec`
 - `llm-agents-orchestrator-sokqa`
 - `sokqa-json-shape-tts-validator`
-- `nextjs-sokqa-pack-api`
+- `nextjs-sokqa-pack-api` (legacy skill name, currently used for local generation and export workflow)
 
 Runtime flow:
 
@@ -230,8 +230,30 @@ npm run typecheck
 
 ## Roadmap
 
-- `v0.2`: ZIP export, README refresh, OSS cleanup
-- `v0.3`: multiple documents, multiple quiz packs
-- `v0.4`: template system for restaurant, hotel, retail, IT training
-- `v0.5`: validation improvements, pack consistency checks
-- `v0.6`: CLI improvements
+```text
+v0.2
+- ZIP export
+- README refresh
+- OSS cleanup
+
+v0.3
+- Config-driven generation
+- Reference modes
+- Exact text document mode
+
+v0.4
+- Multiple documents
+- Multiple quiz packs
+
+v0.5
+- Template system
+  - Restaurant
+  - Hotel
+  - Retail
+  - IT Training
+
+v0.6
+- Validation improvements
+- Pack consistency checks
+- CLI improvements
+```
