@@ -1,0 +1,17 @@
+{
+  "id": "customer-service-source-only",
+  "title": "Customer Service (Source Only)",
+  "description": "Training pack generated strictly from the reference text.",
+  "theme": "customer service for convenience store staff",
+  "language": "en",
+  "documentCount": 1,
+  "quizCount": 1,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/customer-service-source-only",
+  "reference": {
+    "enabled": true,
+    "path": "references/customer-service-manual.txt",
+    "mode": "source_only"
+  }
+}
+

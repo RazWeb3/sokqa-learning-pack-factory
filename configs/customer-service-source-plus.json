@@ -1,0 +1,17 @@
+{
+  "id": "customer-service-source-plus",
+  "title": "Customer Service (Source Plus)",
+  "description": "Training pack generated from the reference text with beginner-friendly supplements.",
+  "theme": "customer service for convenience store staff",
+  "language": "en",
+  "documentCount": 1,
+  "quizCount": 1,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/customer-service-source-plus",
+  "reference": {
+    "enabled": true,
+    "path": "references/customer-service-manual.txt",
+    "mode": "source_plus"
+  }
+}
+

@@ -1,10 +1,10 @@
 {
   "name": "sokqa-pack-factory",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "scripts": {
-    "generate": "tsx scripts/generate-learning-pack.ts",
-    "generate:example": "tsx scripts/generate-learning-pack.ts --input examples/customer-service.txt --id customer-service-pack --title \"Customer Service Training\"",
+    "generate": "node --import tsx scripts/generate-learning-pack.ts",
+    "generate:example": "node --import tsx scripts/generate-learning-pack.ts --config configs/no-reference-topic.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },

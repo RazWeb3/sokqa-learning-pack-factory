@@ -72,24 +72,130 @@ LICENSE
 npm install
 ```
 
+## Basic Usage
+
+```bash
+npm install
+npm run generate -- --config configs/no-reference-topic.json
+```
+
+Generated pack:
+
+```text
+output/<pack-id>/
+  metadata.json
+  doc_01.json
+  quiz_01.json
+  learning-pack.zip
+```
+
+## Config-based Generation
+
+Config-driven generation (recommended):
+
+```bash
+npm run generate -- --config configs/no-reference-topic.json
+```
+
+By editing the config JSON, you can change:
+- id
+- title
+- description
+- theme
+- language
+- documentCount
+- quizCount
+- questionsPerQuiz
+- outputDir
+- reference.enabled
+- reference.path
+- reference.mode
+
+## Reference Modes
+
+### none
+
+No reference material. Generate from `theme / title / description`.
+
+### source_only
+
+Generate based only on the reference material.
+
+Safety note:
+
+```text
+source_only is a “no extra knowledge” policy, but if LLM-based generation is used it is not a perfect verbatim guarantee.
+If you need “exact text only” JSON conversion, use exact_text_document.
+```
+
+### source_plus
+
+Generate centered on the reference material, plus supplemental explanations/examples for learners.
+
+### exact_text_document
+
+Convert the reference text into document JSON using only the original text.
+
+- Quiz is not generated
+- quizCount is treated as 0
+- No extra sentences: no summary, no paraphrase, no additions
+
+## Reference File Usage
+
+With reference:
+
+```json
+{
+  "reference": {
+    "enabled": true,
+    "path": "references/customer-service-manual.txt",
+    "mode": "source_only"
+  }
+}
+```
+
+Without reference:
+
+```json
+{
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}
+```
+
+## Example Configs
+
+```text
+configs/no-reference-topic.json
+  Generate from theme without reference
+
+configs/customer-service-source-only.json
+  Generate strictly from reference
+
+configs/customer-service-source-plus.json
+  Generate from reference with supplements
+
+configs/customer-service-exact-text.json
+  Convert reference text into document only (no quiz)
+```
+
 ## Generate
 
-Example run:
-
 ```bash
-npm run generate:example
+npm run generate -- --config configs/no-reference-topic.json
+npm run generate -- --config configs/customer-service-source-only.json
+npm run generate -- --config configs/customer-service-source-plus.json
+npm run generate -- --config configs/customer-service-exact-text.json
 ```
 
-Custom input file:
+Ad-hoc input (non-config):
 
 ```bash
-npm run generate -- --input examples/customer-service.txt --id customer-service-pack --title "Customer Service Training"
-```
-
-Direct text input:
-
-```bash
-npm run generate -- --text "Customer service basics..." --id customer-service-pack
+npm run generate -- --input examples/customer-service.txt
+npm run generate -- --text "Customer service basics..."
 ```
 
 ## Validation

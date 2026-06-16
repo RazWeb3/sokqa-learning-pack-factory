@@ -18,8 +18,8 @@ export async function buildLearningPackZipBytes(pack: LearningPack) {
   return buildZip(pack).generateAsync({ type: "uint8array" })
 }
 
-export async function writeLearningPackOutput(pack: LearningPack, outputRoot: string) {
-  const packDirectory = path.join(outputRoot, pack.metadata.id)
+export async function writeLearningPackOutput(pack: LearningPack, outputDir: string) {
+  const packDirectory = path.resolve(process.cwd(), outputDir)
   await mkdir(packDirectory, { recursive: true })
 
   for (const file of serializeLearningPackFiles(pack)) {

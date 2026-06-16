@@ -1,0 +1,17 @@
+{
+  "id": "customer-service-exact-text",
+  "title": "Customer Service Manual (Exact Text)",
+  "description": "Reference text is converted into document JSON without AI supplements. Quiz is disabled.",
+  "theme": "customer service for convenience store staff",
+  "language": "en",
+  "documentCount": 1,
+  "quizCount": 2,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/customer-service-exact-text",
+  "reference": {
+    "enabled": true,
+    "path": "references/customer-service-manual.txt",
+    "mode": "exact_text_document"
+  }
+}
+

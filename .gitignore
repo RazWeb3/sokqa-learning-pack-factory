@@ -23,6 +23,8 @@ coverage/
 .env.local
 *.zip
 output/
+references/*
+!references/customer-service-manual.txt
 
 # logs
 npm-debug.log*

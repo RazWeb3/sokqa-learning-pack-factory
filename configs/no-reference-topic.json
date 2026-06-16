@@ -1,0 +1,17 @@
+{
+  "id": "no-reference-topic-pack",
+  "title": "No Reference Topic Pack",
+  "description": "Generated from theme/title/description without any reference material.",
+  "theme": "customer service for convenience store staff",
+  "language": "en",
+  "documentCount": 1,
+  "quizCount": 1,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/no-reference-topic-pack",
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}
+

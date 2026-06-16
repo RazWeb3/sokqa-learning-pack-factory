@@ -2,26 +2,30 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 
 import { generateLearningPack } from "../lib/learning-pack"
+import { loadLearningPackConfig, resolveFrom } from "../lib/learning-pack-config"
 import { writeLearningPackOutput } from "../lib/learning-pack-zip"
 
 type CliOptions = {
+  configFile?: string
   inputFile?: string
   text?: string
-  packId?: string
-  title?: string
-  outputRoot: string
 }
 
 function parseArgs(argv: string[]): CliOptions {
-  const options: CliOptions = {
-    outputRoot: path.resolve(process.cwd(), "output"),
-  }
+  const options: CliOptions = {}
+  const positional: string[] = []
 
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index]
     const value = argv[index + 1]
 
     switch (argument) {
+      case "--":
+        break
+      case "--config":
+        options.configFile = value
+        index += 1
+        break
       case "--input":
         options.inputFile = value
         index += 1
@@ -30,52 +34,86 @@ function parseArgs(argv: string[]): CliOptions {
         options.text = value
         index += 1
         break
-      case "--id":
-        options.packId = value
-        index += 1
-        break
-      case "--title":
-        options.title = value
-        index += 1
-        break
-      case "--output":
-        options.outputRoot = path.resolve(process.cwd(), value)
-        index += 1
-        break
       default:
-        throw new Error(`Unknown argument: ${argument}`)
+        if (argument.startsWith("-")) {
+          throw new Error(`Unknown argument: ${argument}`)
+        }
+        positional.push(argument)
+    }
+  }
+
+  if (!options.configFile && positional.length > 0 && positional[0].toLowerCase().endsWith(".json")) {
+    options.configFile = positional[0]
+    positional.splice(0, 1)
+  }
+  if (!options.configFile && !options.inputFile && !options.text && positional.length > 0) {
+    const first = positional[0]
+    if (first.toLowerCase().endsWith(".txt") || first.toLowerCase().endsWith(".md")) {
+      options.inputFile = first
+    } else {
+      options.text = positional.join(" ")
     }
   }
 
   return options
 }
 
-async function loadSourceText(options: CliOptions) {
-  if (options.text?.trim()) {
-    return options.text
-  }
-
-  if (options.inputFile) {
-    return readFile(path.resolve(process.cwd(), options.inputFile), "utf8")
-  }
-
-  throw new Error("Provide either --input <file> or --text <content>")
+async function loadTextFromFile(filePath: string) {
+  return readFile(path.resolve(process.cwd(), filePath), "utf8")
 }
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
-  const text = await loadSourceText(options)
-  const pack = generateLearningPack({
-    text,
-    packId: options.packId,
-    title: options.title,
-  })
+
+  if (options.configFile) {
+    const config = await loadLearningPackConfig(options.configFile)
+    const referenceText =
+      config.reference.enabled && config.reference.path.trim()
+        ? await readFile(resolveFrom(process.cwd(), config.reference.path.trim()), "utf8")
+        : undefined
+
+    const pack = generateLearningPack(config, referenceText)
+    if (!pack.validation.passed) {
+      throw new Error(`Validation failed: ${pack.validation.errors.join("; ")}`)
+    }
+
+    const result = await writeLearningPackOutput(pack, config.outputDir)
+    console.log(`Generated: ${pack.metadata.title}`)
+    console.log(`Pack ID: ${pack.metadata.id}`)
+    console.log(`Output: ${result.packDirectory}`)
+    console.log(`Files: ${result.files.join(", ")}`)
+    return
+  }
+
+  const sourceText = options.inputFile
+    ? await loadTextFromFile(options.inputFile)
+    : options.text?.trim()
+      ? options.text
+      : await loadTextFromFile("examples/customer-service.txt")
+
+  const stamp = Date.now()
+  const adHocId = `pack-${stamp}`
+  const pack = generateLearningPack(
+    {
+      id: adHocId,
+      title: "Ad-hoc Learning Pack",
+      description: "Generated learning pack",
+      theme: "custom topic",
+      language: "en",
+      documentCount: 1,
+      quizCount: 1,
+      questionsPerQuiz: 5,
+      outputDir: `output/${adHocId}`,
+      reference: { enabled: true, path: "CLI", mode: "source_plus" },
+    },
+    sourceText,
+  )
 
   if (!pack.validation.passed) {
     throw new Error(`Validation failed: ${pack.validation.errors.join("; ")}`)
   }
 
-  const result = await writeLearningPackOutput(pack, options.outputRoot)
+  const result = await writeLearningPackOutput(pack, `output/${pack.metadata.id}`)
 
   console.log(`Generated: ${pack.metadata.title}`)
   console.log(`Pack ID: ${pack.metadata.id}`)

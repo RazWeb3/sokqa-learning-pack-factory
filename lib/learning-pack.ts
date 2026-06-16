@@ -1,13 +1,6 @@
 import { randomUUID } from "node:crypto"
 
-export type AnalyzerResult = {
-  trainingTopic: string
-  targetRole: string
-  keyPoints: string[]
-  servicePhrases: string[]
-  importantRules: string[]
-  commonMistakes: string[]
-}
+import type { LearningPackConfig, ReferenceMode } from "./learning-pack-config"
 
 export type DocumentFile = {
   id: string
@@ -15,7 +8,7 @@ export type DocumentFile = {
   schemaVersion: 1
   title: string
   description: string
-  language: "en"
+  language: string
   globalTags: string[]
   documents: Array<{ id: string; text: string; tts: { text: string } }>
 }
@@ -26,7 +19,7 @@ export type QuizFile = {
   schemaVersion: 1
   title: string
   description: string
-  language: "en"
+  language: string
   globalTags: string[]
   questions: Array<{
     id: string
@@ -49,7 +42,13 @@ export type MetadataFile = {
   description: string
   createdAt: string
   generator: "sokqa-learning-pack-factory"
-  version: "0.2.0"
+  version: "0.3.0"
+  language: string
+  source: {
+    hasReference: boolean
+    mode: ReferenceMode
+    path: string
+  }
   documents: string[]
   quizzes: string[]
 }
@@ -73,13 +72,6 @@ export type LearningPack = {
   validation: ValidationResult
 }
 
-export type GenerateLearningPackOptions = {
-  text: string
-  packId?: string
-  title?: string
-  createdAt?: string
-}
-
 type PackPayload = Omit<LearningPack, "validation">
 
 function ensureEndsWithComma(text: string) {
@@ -87,24 +79,18 @@ function ensureEndsWithComma(text: string) {
   return trimmed.endsWith(",") ? trimmed : `${trimmed},`
 }
 
-function toJaTts(text: string) {
+function isJapaneseLanguage(language: string) {
+  return language.toLowerCase().startsWith("ja")
+}
+
+function ttsPrefix(language: string) {
+  return isJapaneseLanguage(language) ? "[ja-JP]" : "[en-US]"
+}
+
+function toTts(language: string, text: string) {
   const trimmed = text.trim().replace(/[、,]+$/g, "")
-  return `[ja-JP]${trimmed}、`
-}
-
-function toEnTts(text: string) {
-  const trimmed = text.trim().replace(/,+$/g, "")
-  return `[en-US]${trimmed},`
-}
-
-function choicesTts(choices: [string, string, string, string]) {
-  return ensureEndsWithComma(
-    `[en-US]Number 1, ${choices[0]}, Number 2, ${choices[1]}, Number 3, ${choices[2]}, Number 4, ${choices[3]},`,
-  )
-}
-
-function answerTts(answerNumber: 1 | 2 | 3 | 4, choiceText: string) {
-  return ensureEndsWithComma(`[en-US]The correct answer is Number ${answerNumber}, ${choiceText},`)
+  const suffix = isJapaneseLanguage(language) ? "、" : ","
+  return `${ttsPrefix(language)}${trimmed}${suffix}`
 }
 
 function buildPackId() {
@@ -120,185 +106,205 @@ function normalizePackId(packId: string) {
     .replace(/^-+|-+$/g, "")
 
   if (!normalized) {
-    throw new Error("packId must contain at least one alphanumeric character")
+    throw new Error("id must contain at least one alphanumeric character")
   }
 
   return normalized
 }
 
-function extractServicePhrases(text: string) {
-  const lines = text
+function isPlainText(value: unknown) {
+  return typeof value === "string" && value.trim().length > 0
+}
+
+function clampMin(value: number, min: number) {
+  return value < min ? min : value
+}
+
+function splitNonEmptyLines(text: string) {
+  return text
     .split(/\r?\n/g)
     .map((line) => line.trim())
     .filter(Boolean)
-
-  const phrases = new Set<string>()
-  for (const line of lines) {
-    const matches = line.match(/[ぁ-んァ-ン一-龯][^,，。.!！?？\n]{1,24}/g) ?? []
-    for (const match of matches) {
-      const phrase = match.trim().replace(/[。．.！!？?]+$/g, "")
-      if (phrase.length >= 2 && phrase.length <= 24) {
-        phrases.add(phrase)
-      }
-    }
-  }
-
-  const defaults = [
-    "お疲れ様です",
-    "いらっしゃいませ",
-    "ありがとうございます",
-    "少々お待ちください",
-    "申し訳ございません",
-  ]
-
-  const merged = [...phrases]
-  for (const fallback of defaults) {
-    if (merged.length >= 5) {
-      break
-    }
-    if (!merged.includes(fallback)) {
-      merged.push(fallback)
-    }
-  }
-
-  return merged.slice(0, 5)
 }
 
-export function analyzeManualText(text: string): AnalyzerResult {
-  const normalized = text
-    .split(/\r?\n/g)
-    .map((line) => line.trim())
+function splitParagraphs(text: string) {
+  const normalized = text.replace(/\r\n/g, "\n").trim()
+  if (!normalized) {
+    return []
+  }
+  return normalized
+    .split(/\n\s*\n/g)
+    .map((block) => block.trim())
     .filter(Boolean)
-
-  return {
-    trainingTopic: "Customer Service Basics",
-    targetRole: "Frontline staff (beginner)",
-    keyPoints: normalized.slice(0, 3).map((line) => line.replace(/^[-*]\s*/, "")),
-    servicePhrases: extractServicePhrases(text),
-    importantRules: ["Be polite", "Be clear", "Stay calm"],
-    commonMistakes: ["Too casual speech", "Not confirming numbers", "Not asking for help"],
-  }
 }
 
-export function buildDocumentFile(packId: string, analyzer: AnalyzerResult): DocumentFile {
-  const primaryPhrase = analyzer.servicePhrases[0] ?? "お疲れ様です"
-  const topic = analyzer.trainingTopic
+function chunkEvenly<T>(items: T[], chunkCount: number) {
+  const safeChunkCount = clampMin(chunkCount, 1)
+  const chunks: T[][] = Array.from({ length: safeChunkCount }, () => [])
+  for (let index = 0; index < items.length; index += 1) {
+    chunks[index % safeChunkCount].push(items[index])
+  }
+  return chunks
+}
 
+function buildDocumentFile(
+  config: LearningPackConfig,
+  docIndex: number,
+  items: Array<{ text: string; ttsText: string }>,
+): DocumentFile {
+  const fileIndex = String(docIndex + 1).padStart(2, "0")
   return {
-    id: `${packId}_doc_01`,
+    id: `${config.id}_doc_${fileIndex}`,
     type: "document",
     schemaVersion: 1,
-    title: `${topic}: Guided Practice`,
-    description: "A reusable document pack generated by Trae Skills.",
-    language: "en",
-    globalTags: ["trae-skills", "local-first", "listening"],
-    documents: [
-      {
-        id: "doc-1",
-        text: `Overview. ${topic} introduces polite customer-facing communication.`,
-        tts: { text: ensureEndsWithComma(`Overview, ${topic} introduces polite customer-facing communication,`) },
-      },
-      {
-        id: "doc-2",
-        text: `Role Focus. Learners practice as ${analyzer.targetRole}.`,
-        tts: { text: ensureEndsWithComma(`Role Focus, Learners practice as ${analyzer.targetRole},`) },
-      },
-      {
-        id: "doc-3",
-        text: `Key Point. ${analyzer.keyPoints[0] ?? "Use clear and polite language."}`,
-        tts: {
-          text: ensureEndsWithComma(`Key Point, ${analyzer.keyPoints[0] ?? "Use clear and polite language."}`),
-        },
-      },
-      {
-        id: "doc-4",
-        text: `Phrase Practice. Today's phrase is ${primaryPhrase}. Listen and repeat.`,
-        tts: {
-          text: ensureEndsWithComma(`Phrase Practice, Today's phrase is ${toJaTts(primaryPhrase)}${toEnTts("Listen and repeat")}`),
-        },
-      },
-      {
-        id: "doc-5",
-        text: `Rule Reminder. ${analyzer.importantRules[0] ?? "Be polite"}.`,
-        tts: {
-          text: ensureEndsWithComma(`Rule Reminder, ${analyzer.importantRules[0] ?? "Be polite"},`),
-        },
-      },
-      {
-        id: "doc-6",
-        text: `Review. Avoid ${analyzer.commonMistakes[0] ?? "too casual speech"} during service interactions.`,
-        tts: {
-          text: ensureEndsWithComma(
-            `Review, Avoid ${analyzer.commonMistakes[0] ?? "too casual speech"} during service interactions,`,
-          ),
-        },
-      },
-    ],
+    title: config.documentCount > 1 ? `${config.title} (${fileIndex})` : config.title,
+    description: config.description?.trim() || "Generated learning pack",
+    language: config.language,
+    globalTags: ["sokqa-learning-pack-factory"],
+    documents: items.map((item, index) => ({
+      id: `doc-${index + 1}`,
+      text: item.text,
+      tts: { text: item.ttsText },
+    })),
   }
 }
 
-export function buildQuizFile(packId: string, analyzer: AnalyzerResult): QuizFile {
-  const phrases = analyzer.servicePhrases.length > 0 ? analyzer.servicePhrases : ["お疲れ様です"]
-
-  const questions: QuizFile["questions"] = Array.from({ length: 5 }, (_, index) => {
-    const phrase = phrases[index % phrases.length]
-    const choices: [string, string, string, string] = [
-      "Thank you",
-      "Excuse me / Sorry",
-      "A polite workplace greeting",
-      "Good night",
-    ]
-
-    return {
-      id: `q-${index + 1}`,
-      question: `What does ${phrase} signal in a service context?`,
-      choices,
-      answerIndex: 2,
-      explanation: "It works as a polite workplace greeting and signals respect.",
-      tts: {
-        questionText: ensureEndsWithComma(`[en-US]What does ${toJaTts(phrase)}${toEnTts("signal in a service context")}`),
-        choicesText: choicesTts(choices),
-        answerText: answerTts(3, choices[2]),
-        explanationText: ensureEndsWithComma(
-          "[en-US]It works as a polite workplace greeting and signals respect,",
-        ),
-      },
-    }
-  })
-
+function buildQuizFile(config: LearningPackConfig, quizIndex: number, questions: QuizFile["questions"]): QuizFile {
+  const fileIndex = String(quizIndex + 1).padStart(2, "0")
   return {
-    id: `${packId}_quiz_01`,
+    id: `${config.id}_quiz_${fileIndex}`,
     type: "quiz",
     schemaVersion: 1,
-    title: `${analyzer.trainingTopic}: Meaning Check`,
-    description: "A reusable 5-question quiz generated by Trae Skills.",
-    language: "en",
-    globalTags: ["trae-skills", "local-first", "quiz"],
+    title: config.quizCount > 1 ? `${config.title} Quiz (${fileIndex})` : `${config.title} Quiz`,
+    description: config.description?.trim() || "Generated learning pack",
+    language: config.language,
+    globalTags: ["sokqa-learning-pack-factory"],
     questions,
   }
 }
 
-export function buildMetadataFile(
-  packId: string,
-  title: string,
+function buildMetadataFile(
+  config: LearningPackConfig,
   documents: DocumentFile[],
   quizzes: QuizFile[],
+  source: MetadataFile["source"],
   createdAt = new Date().toISOString(),
 ): MetadataFile {
   return {
-    id: packId,
-    title,
-    description: "Generated learning pack",
+    id: config.id,
+    title: config.title,
+    description: config.description?.trim() || "Generated learning pack",
     createdAt,
     generator: "sokqa-learning-pack-factory",
-    version: "0.2.0",
+    version: "0.3.0",
+    language: config.language,
+    source,
     documents: documents.map((_, index) => `doc_${String(index + 1).padStart(2, "0")}.json`),
     quizzes: quizzes.map((_, index) => `quiz_${String(index + 1).padStart(2, "0")}.json`),
   }
 }
 
-function isPlainText(value: unknown) {
-  return typeof value === "string" && value.trim().length > 0
+function buildGenericDocumentItems(config: LearningPackConfig, strict: boolean) {
+  const base = [
+    `Theme: ${config.theme}`,
+    `Goal: ${config.title}`,
+    `Key Points: ${config.description?.trim() || config.theme}`,
+  ]
+  return base.map((text) => ({
+    text,
+    ttsText: strict ? text : ensureEndsWithComma(toTts(config.language, text)),
+  }))
+}
+
+function buildSourceOnlyDocumentItems(lines: string[]) {
+  const items = lines.map((line) => ({ text: line, ttsText: line }))
+  if (items.length === 0) {
+    throw new Error("reference must contain at least one non-empty line for source_only")
+  }
+  return items
+}
+
+function buildSourcePlusDocumentItems(config: LearningPackConfig, lines: string[]) {
+  const sourceLines = lines.slice(0, 6)
+  const items: Array<{ text: string; ttsText: string }> = []
+
+  for (const line of sourceLines) {
+    items.push({ text: line, ttsText: ensureEndsWithComma(toTts(config.language, line)) })
+  }
+
+  const supplement = [
+    `Summary: This pack covers ${config.theme}.`,
+    "Practice: Read the examples aloud and answer the quiz questions.",
+  ]
+  for (const text of supplement) {
+    items.push({ text, ttsText: ensureEndsWithComma(toTts(config.language, text)) })
+  }
+  return items
+}
+
+function buildExactTextDocumentItems(paragraphs: string[]) {
+  const items = paragraphs.map((p) => ({ text: p, ttsText: p }))
+  if (items.length === 0) {
+    throw new Error("reference must contain at least one paragraph for exact_text_document")
+  }
+  return items
+}
+
+function buildGenericQuizQuestions(config: LearningPackConfig, count: number): QuizFile["questions"] {
+  const questions: QuizFile["questions"] = []
+  for (let index = 0; index < count; index += 1) {
+    const choices: [string, string, string, string] = [
+      `Focus on ${config.theme}`,
+      "Ignore customer context",
+      "Skip confirmation steps",
+      "Use unclear language",
+    ]
+    questions.push({
+      id: `q-${index + 1}`,
+      question: `Which choice best aligns with the theme: ${config.theme}?`,
+      choices,
+      answerIndex: 0,
+      explanation: `It directly matches the theme: ${config.theme}.`,
+      tts: {
+        questionText: ensureEndsWithComma(toTts(config.language, `Which choice best aligns with the theme: ${config.theme}?`)),
+        choicesText: ensureEndsWithComma(toTts(config.language, `1 ${choices[0]}. 2 ${choices[1]}. 3 ${choices[2]}. 4 ${choices[3]}.`)),
+        answerText: ensureEndsWithComma(toTts(config.language, `Answer: ${choices[0]}.`)),
+        explanationText: ensureEndsWithComma(toTts(config.language, `Explanation: It matches the theme.`)),
+      },
+    })
+  }
+  return questions
+}
+
+function buildSourceOnlyQuizQuestions(lines: string[], count: number): QuizFile["questions"] {
+  if (lines.length === 0) {
+    throw new Error("reference must contain at least one non-empty line for source_only quizzes")
+  }
+  const source = lines
+  const questions: QuizFile["questions"] = []
+
+  for (let index = 0; index < count; index += 1) {
+    const a = source[index % source.length]
+    const b = source[(index + 1) % source.length]
+    const c = source[(index + 2) % source.length]
+    const d = source[(index + 3) % source.length]
+    const choices: [string, string, string, string] = [a, b, c, d]
+    questions.push({
+      id: `q-${index + 1}`,
+      question: a,
+      choices,
+      answerIndex: 0,
+      explanation: a,
+      tts: {
+        questionText: a,
+        choicesText: b,
+        answerText: a,
+        explanationText: a,
+      },
+    })
+  }
+
+  return questions
 }
 
 function runValidation(name: string, validator: () => void): ValidationCheck {
@@ -321,8 +327,8 @@ function validateDocument(document: DocumentFile) {
   if (document.schemaVersion !== 1) {
     throw new Error("document.schemaVersion must be 1")
   }
-  if (document.language !== "en") {
-    throw new Error("document.language must be 'en'")
+  if (!isPlainText(document.language)) {
+    throw new Error("document.language is required")
   }
   if (!Array.isArray(document.documents) || document.documents.length < 1) {
     throw new Error("document.documents must contain at least one item")
@@ -348,11 +354,11 @@ function validateQuiz(quiz: QuizFile) {
   if (quiz.schemaVersion !== 1) {
     throw new Error("quiz.schemaVersion must be 1")
   }
-  if (quiz.language !== "en") {
-    throw new Error("quiz.language must be 'en'")
+  if (!isPlainText(quiz.language)) {
+    throw new Error("quiz.language is required")
   }
-  if (!Array.isArray(quiz.questions) || quiz.questions.length !== 5) {
-    throw new Error("quiz.questions must contain exactly 5 items")
+  if (!Array.isArray(quiz.questions) || quiz.questions.length < 1) {
+    throw new Error("quiz.questions must contain at least 1 item")
   }
 
   for (const question of quiz.questions) {
@@ -404,8 +410,39 @@ function validateMetadata(payload: PackPayload) {
   if (metadata.generator !== "sokqa-learning-pack-factory") {
     throw new Error("metadata.generator is invalid")
   }
-  if (metadata.version !== "0.2.0") {
+  if (metadata.version !== "0.3.0") {
     throw new Error("metadata.version is invalid")
+  }
+  if (!isPlainText(metadata.language)) {
+    throw new Error("metadata.language is required")
+  }
+  if (typeof metadata.source?.hasReference !== "boolean") {
+    throw new Error("metadata.source.hasReference is required")
+  }
+  if (!isPlainText(metadata.source?.mode)) {
+    throw new Error("metadata.source.mode is required")
+  }
+  if (typeof metadata.source?.path !== "string") {
+    throw new Error("metadata.source.path is required")
+  }
+  if (!metadata.source.hasReference) {
+    if (metadata.source.mode !== "none") {
+      throw new Error("metadata.source.mode must be none when hasReference is false")
+    }
+    if (metadata.source.path.trim() !== "") {
+      throw new Error("metadata.source.path must be empty when hasReference is false")
+    }
+  }
+
+  for (const document of documents) {
+    if (document.language !== metadata.language) {
+      throw new Error("metadata.language must match document.language")
+    }
+  }
+  for (const quiz of quizzes) {
+    if (quiz.language !== metadata.language) {
+      throw new Error("metadata.language must match quiz.language")
+    }
   }
   if (metadata.documents.length !== documents.length) {
     throw new Error("metadata.documents count does not match documents")
@@ -480,29 +517,75 @@ export function serializeLearningPackFiles(payload: PackPayload) {
   ]
 }
 
-export function generateLearningPack(options: GenerateLearningPackOptions): LearningPack {
-  const normalizedText = options.text.trim()
-  if (!normalizedText) {
-    throw new Error("text is required")
+export function generateLearningPack(configInput: LearningPackConfig, referenceText?: string, createdAt?: string): LearningPack {
+  const config: LearningPackConfig = {
+    ...configInput,
+    id: normalizePackId(configInput.id || buildPackId()),
+    reference: configInput.reference ?? { enabled: false, path: "", mode: "none" },
   }
 
-  const packId = normalizePackId(options.packId ?? buildPackId())
-  const analyzer = analyzeManualText(normalizedText)
-  const documents = [buildDocumentFile(packId, analyzer)]
-  const quizzes = [buildQuizFile(packId, analyzer)]
-  const metadata = buildMetadataFile(
-    packId,
-    options.title?.trim() || "Customer Service Training",
-    documents,
-    quizzes,
-    options.createdAt,
-  )
+  const hasReference = config.reference.enabled && config.reference.path.trim().length > 0
+  const mode: ReferenceMode = hasReference ? config.reference.mode : "none"
+  const source: MetadataFile["source"] = {
+    hasReference,
+    mode,
+    path: hasReference ? config.reference.path : "",
+  }
+
+  const strictReferenceText = mode === "source_only" || mode === "exact_text_document"
+  const referenceValue = referenceText?.trim() || ""
+  if (hasReference && !referenceValue) {
+    throw new Error("reference text is required when reference is enabled")
+  }
+
+  const documentCount = clampMin(config.documentCount, 1)
+  const quizCount = mode === "exact_text_document" ? 0 : clampMin(config.quizCount, 0)
+  const questionsPerQuiz = clampMin(config.questionsPerQuiz, 1)
+
+  const documents: DocumentFile[] = []
+  if (mode === "exact_text_document") {
+    const paragraphs = splitParagraphs(referenceValue)
+    const groups = chunkEvenly(paragraphs, documentCount)
+    for (let index = 0; index < groups.length; index += 1) {
+      documents.push(buildDocumentFile(config, index, buildExactTextDocumentItems(groups[index])))
+    }
+  } else if (mode === "source_only") {
+    const lines = splitNonEmptyLines(referenceValue)
+    const groups = chunkEvenly(lines, documentCount)
+    for (let index = 0; index < groups.length; index += 1) {
+      documents.push(buildDocumentFile(config, index, buildSourceOnlyDocumentItems(groups[index])))
+    }
+  } else if (mode === "source_plus") {
+    const lines = splitNonEmptyLines(referenceValue)
+    for (let index = 0; index < documentCount; index += 1) {
+      documents.push(buildDocumentFile(config, index, buildSourcePlusDocumentItems(config, lines)))
+    }
+  } else {
+    for (let index = 0; index < documentCount; index += 1) {
+      documents.push(buildDocumentFile(config, index, buildGenericDocumentItems(config, strictReferenceText)))
+    }
+  }
+
+  const quizzes: QuizFile[] = []
+  if (quizCount > 0) {
+    if (mode === "source_only") {
+      const lines = splitNonEmptyLines(referenceValue)
+      for (let index = 0; index < quizCount; index += 1) {
+        quizzes.push(buildQuizFile(config, index, buildSourceOnlyQuizQuestions(lines, questionsPerQuiz)))
+      }
+    } else if (mode === "source_plus") {
+      for (let index = 0; index < quizCount; index += 1) {
+        quizzes.push(buildQuizFile(config, index, buildGenericQuizQuestions(config, questionsPerQuiz)))
+      }
+    } else {
+      for (let index = 0; index < quizCount; index += 1) {
+        quizzes.push(buildQuizFile(config, index, buildGenericQuizQuestions(config, questionsPerQuiz)))
+      }
+    }
+  }
+
+  const metadata = buildMetadataFile(config, documents, quizzes, source, createdAt)
   const validation = validateLearningPack({ documents, quizzes, metadata })
 
-  return {
-    documents,
-    quizzes,
-    metadata,
-    validation,
-  }
+  return { documents, quizzes, metadata, validation }
 }
