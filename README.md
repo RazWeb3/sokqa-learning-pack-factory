@@ -257,3 +257,15 @@ v0.6
 - Pack consistency checks
 - CLI improvements
 ```
+
+## License
+
+MIT License
+
+See LICENSE for details.
+
+## Contributing
+
+Issues and pull requests are welcome.
+
+If you find bugs, validation problems, or ideas for improving learning pack generation, please open an issue.
