@@ -1,0 +1,16 @@
+{
+  "id": "multi-pack",
+  "title": "Multi Pack Example",
+  "description": "Example pack with multiple documents and quizzes.",
+  "theme": "customer service training",
+  "language": "en",
+  "documentCount": 3,
+  "quizCount": 2,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/multi-pack",
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}

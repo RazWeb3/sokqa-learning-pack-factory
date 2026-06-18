@@ -1,5 +1,5 @@
 ---
-title: SokQA Learning Pack Factory OSS Edition Spec v0.2
+title: SokQA Learning Pack Factory OSS Edition Spec v0.4
 ---
 
 # Learning Pack Generator Powered by Trae Skills
@@ -70,7 +70,9 @@ LICENSE
 
 - `metadata.json`
 - `doc_01.json`
+- `doc_02.json` ... `doc_NN.json`
 - `quiz_01.json`
+- `quiz_02.json` ... `quiz_NN.json`
 - `learning-pack.zip`
 
 保存先例:
@@ -78,7 +80,10 @@ LICENSE
 ```text
 output/customer-service-pack/
   doc_01.json
+  doc_02.json
+  doc_03.json
   quiz_01.json
+  quiz_02.json
   metadata.json
   learning-pack.zip
 ```
@@ -91,9 +96,9 @@ output/customer-service-pack/
 {
   "id": "customer-service-pack",
   "title": "Customer Service Training",
-  "version": "0.2.0",
-  "documents": ["doc_01.json"],
-  "quizzes": ["quiz_01.json"]
+  "version": "0.4.0",
+  "documents": ["doc_01.json", "doc_02.json", "doc_03.json"],
+  "quizzes": ["quiz_01.json", "quiz_02.json"]
 }
 ```
 
@@ -148,6 +153,11 @@ Validator が行うこと:
 - `choices.length === 4`
 - `answerIndex` 範囲チェック
 - metadata と出力ファイル一覧の整合性チェック
+- `documentCount` と document 数の整合性チェック
+- `quizCount` と quiz 数の整合性チェック
+- `questionsPerQuiz` と各 quiz 問題数の整合性チェック
+- ZIP 内ファイル一覧と metadata の整合性チェック
+- `exact_text_document` では quiz が 0 件であること
 
 TTS 方針:
 
@@ -213,10 +223,18 @@ node_modules/
 
 ### v0.3
 
-- Multiple Documents
-- Multiple Quiz Packs
+- Config-driven generation
+- Reference modes
+- Exact text document mode
 
 ### v0.4
+
+- Multiple Documents
+- Multiple Quiz Packs
+- questionsPerQuiz-driven quiz output
+- metadata / ZIP consistency checks
+
+### v0.5
 
 - Template System
 - Restaurant
@@ -224,12 +242,12 @@ node_modules/
 - Retail
 - IT Training
 
-### v0.5
+### v0.6
 
 - Validation Improvements
 - Pack Consistency Check
 
-### v0.6
+### v0.7
 
 - CLI Improvements
 

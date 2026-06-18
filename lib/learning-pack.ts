@@ -42,7 +42,7 @@ export type MetadataFile = {
   description: string
   createdAt: string
   generator: "sokqa-learning-pack-factory"
-  version: "0.3.0"
+  version: "0.4.0"
   language: string
   source: {
     hasReference: boolean
@@ -73,6 +73,13 @@ export type LearningPack = {
 }
 
 type PackPayload = Omit<LearningPack, "validation">
+
+type ValidationExpectations = {
+  documentCount: number
+  quizCount: number
+  questionsPerQuiz: number
+  mode: ReferenceMode
+}
 
 function ensureEndsWithComma(text: string) {
   const trimmed = text.trim()
@@ -118,6 +125,14 @@ function isPlainText(value: unknown) {
 
 function clampMin(value: number, min: number) {
   return value < min ? min : value
+}
+
+function buildDocumentFileName(index: number) {
+  return `doc_${String(index + 1).padStart(2, "0")}.json`
+}
+
+function buildQuizFileName(index: number) {
+  return `quiz_${String(index + 1).padStart(2, "0")}.json`
 }
 
 function splitNonEmptyLines(text: string) {
@@ -196,11 +211,11 @@ function buildMetadataFile(
     description: config.description?.trim() || "Generated learning pack",
     createdAt,
     generator: "sokqa-learning-pack-factory",
-    version: "0.3.0",
+    version: "0.4.0",
     language: config.language,
     source,
-    documents: documents.map((_, index) => `doc_${String(index + 1).padStart(2, "0")}.json`),
-    quizzes: quizzes.map((_, index) => `quiz_${String(index + 1).padStart(2, "0")}.json`),
+    documents: documents.map((_, index) => buildDocumentFileName(index)),
+    quizzes: quizzes.map((_, index) => buildQuizFileName(index)),
   }
 }
 
@@ -410,7 +425,7 @@ function validateMetadata(payload: PackPayload) {
   if (metadata.generator !== "sokqa-learning-pack-factory") {
     throw new Error("metadata.generator is invalid")
   }
-  if (metadata.version !== "0.3.0") {
+  if (metadata.version !== "0.4.0") {
     throw new Error("metadata.version is invalid")
   }
   if (!isPlainText(metadata.language)) {
@@ -451,8 +466,8 @@ function validateMetadata(payload: PackPayload) {
     throw new Error("metadata.quizzes count does not match quizzes")
   }
 
-  const expectedDocuments = documents.map((_, index) => `doc_${String(index + 1).padStart(2, "0")}.json`)
-  const expectedQuizzes = quizzes.map((_, index) => `quiz_${String(index + 1).padStart(2, "0")}.json`)
+  const expectedDocuments = documents.map((_, index) => buildDocumentFileName(index))
+  const expectedQuizzes = quizzes.map((_, index) => buildQuizFileName(index))
 
   if (metadata.documents.some((fileName, index) => fileName !== expectedDocuments[index])) {
     throw new Error("metadata.documents does not match generated files")
@@ -462,7 +477,39 @@ function validateMetadata(payload: PackPayload) {
   }
 }
 
-export function validateLearningPack(payload: PackPayload): ValidationResult {
+function validateGenerationCounts(payload: PackPayload, expectations: ValidationExpectations) {
+  if (payload.documents.length !== expectations.documentCount) {
+    throw new Error(`generated document count ${payload.documents.length} does not match documentCount ${expectations.documentCount}`)
+  }
+  if (payload.quizzes.length !== expectations.quizCount) {
+    throw new Error(`generated quiz count ${payload.quizzes.length} does not match quizCount ${expectations.quizCount}`)
+  }
+  if (expectations.mode === "exact_text_document" && payload.quizzes.length !== 0) {
+    throw new Error("exact_text_document must not generate quizzes")
+  }
+
+  for (const quiz of payload.quizzes) {
+    if (quiz.questions.length !== expectations.questionsPerQuiz) {
+      throw new Error(
+        `quiz ${quiz.id} question count ${quiz.questions.length} does not match questionsPerQuiz ${expectations.questionsPerQuiz}`,
+      )
+    }
+  }
+}
+
+function validateSerializedFiles(payload: PackPayload) {
+  const serializedFileNames = serializeLearningPackFiles(payload).map((file) => file.fileName)
+  const expectedFileNames = ["metadata.json", ...payload.metadata.documents, ...payload.metadata.quizzes]
+
+  if (serializedFileNames.length !== expectedFileNames.length) {
+    throw new Error("serialized file count does not match metadata")
+  }
+  if (serializedFileNames.some((fileName, index) => fileName !== expectedFileNames[index])) {
+    throw new Error("serialized files do not match metadata")
+  }
+}
+
+export function validateLearningPack(payload: PackPayload, expectations?: ValidationExpectations): ValidationResult {
   const checks = [
     runValidation("documents-json-parse", () => {
       for (const document of payload.documents) {
@@ -490,7 +537,18 @@ export function validateLearningPack(payload: PackPayload): ValidationResult {
     runValidation("metadata-consistency", () => {
       validateMetadata(payload)
     }),
+    runValidation("serialized-files-consistency", () => {
+      validateSerializedFiles(payload)
+    }),
   ]
+
+  if (expectations) {
+    checks.push(
+      runValidation("generation-counts", () => {
+        validateGenerationCounts(payload, expectations)
+      }),
+    )
+  }
 
   const errors = checks.filter((check) => !check.passed).map((check) => `${check.name}: ${check.message}`)
   return {
@@ -507,11 +565,11 @@ export function serializeLearningPackFiles(payload: PackPayload) {
       content: JSON.stringify(payload.metadata, null, 2),
     },
     ...payload.documents.map((document, index) => ({
-      fileName: `doc_${String(index + 1).padStart(2, "0")}.json`,
+      fileName: buildDocumentFileName(index),
       content: JSON.stringify(document, null, 2),
     })),
     ...payload.quizzes.map((quiz, index) => ({
-      fileName: `quiz_${String(index + 1).padStart(2, "0")}.json`,
+      fileName: buildQuizFileName(index),
       content: JSON.stringify(quiz, null, 2),
     })),
   ]
@@ -585,7 +643,10 @@ export function generateLearningPack(configInput: LearningPackConfig, referenceT
   }
 
   const metadata = buildMetadataFile(config, documents, quizzes, source, createdAt)
-  const validation = validateLearningPack({ documents, quizzes, metadata })
+  const validation = validateLearningPack(
+    { documents, quizzes, metadata },
+    { documentCount, quizCount, questionsPerQuiz, mode },
+  )
 
   return { documents, quizzes, metadata, validation }
 }

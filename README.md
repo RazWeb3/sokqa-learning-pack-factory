@@ -45,7 +45,10 @@ Generated packs are written to `output/<pack-id>/`.
 output/customer-service-pack/
   metadata.json
   doc_01.json
+  doc_02.json
+  doc_03.json
   quiz_01.json
+  quiz_02.json
   learning-pack.zip
 ```
 
@@ -77,6 +80,7 @@ npm install
 ```bash
 npm install
 npm run generate -- --config configs/no-reference-topic.json
+npm run generate -- --config configs/multiple-docs-quizzes.json
 ```
 
 Generated pack:
@@ -85,7 +89,10 @@ Generated pack:
 output/<pack-id>/
   metadata.json
   doc_01.json
+  doc_02.json
+  doc_03.json
   quiz_01.json
+  quiz_02.json
   learning-pack.zip
 ```
 
@@ -180,6 +187,9 @@ configs/customer-service-source-plus.json
 
 configs/customer-service-exact-text.json
   Convert reference text into document only (no quiz)
+
+configs/multiple-docs-quizzes.json
+  Generate 3 documents and 2 quiz packs from config
 ```
 
 ## Generate
@@ -189,6 +199,24 @@ npm run generate -- --config configs/no-reference-topic.json
 npm run generate -- --config configs/customer-service-source-only.json
 npm run generate -- --config configs/customer-service-source-plus.json
 npm run generate -- --config configs/customer-service-exact-text.json
+npm run generate -- --config configs/multiple-docs-quizzes.json
+```
+
+Multiple document / quiz example:
+
+```bash
+npm run generate -- --config configs/multiple-docs-quizzes.json
+```
+
+```text
+output/multi-pack/
+  metadata.json
+  doc_01.json
+  doc_02.json
+  doc_03.json
+  quiz_01.json
+  quiz_02.json
+  learning-pack.zip
 ```
 
 Ad-hoc input (non-config):
@@ -211,6 +239,17 @@ Run type checks:
 ```bash
 npm run typecheck
 ```
+
+Validation covers:
+
+- `documentCount >= 1`
+- `quizCount >= 0`
+- `questionsPerQuiz >= 1`
+- generated document / quiz counts
+- per-quiz question counts
+- metadata file list consistency
+- ZIP file list consistency
+- `exact_text_document` quiz suppression
 
 ## Included Assets
 
@@ -241,9 +280,11 @@ v0.3
 - Reference modes
 - Exact text document mode
 
-v0.4
+v0.4 (implemented)
 - Multiple documents
 - Multiple quiz packs
+- questionsPerQuiz-driven quiz output
+- metadata / ZIP consistency checks
 
 v0.5
 - Template system
