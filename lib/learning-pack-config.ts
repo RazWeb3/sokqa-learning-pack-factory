@@ -2,6 +2,7 @@ import { access, readFile } from "node:fs/promises"
 import path from "node:path"
 
 export type ReferenceMode = "none" | "source_only" | "source_plus" | "exact_text_document"
+export const SUPPORTED_REFERENCE_EXTENSIONS = [".txt", ".md", ".pdf"] as const
 
 export type LearningPackConfig = {
   id: string
@@ -15,7 +16,8 @@ export type LearningPackConfig = {
   outputDir: string
   reference: {
     enabled: boolean
-    path: string
+    path?: string
+    paths?: string[]
     mode: ReferenceMode
   }
 }
@@ -39,6 +41,31 @@ export function resolveFrom(baseDir: string, maybeRelativePath: string) {
   return path.isAbsolute(maybeRelativePath) ? maybeRelativePath : path.resolve(baseDir, maybeRelativePath)
 }
 
+function isSupportedReferencePath(referencePath: string) {
+  return SUPPORTED_REFERENCE_EXTENSIONS.includes(path.extname(referencePath).toLowerCase() as (typeof SUPPORTED_REFERENCE_EXTENSIONS)[number])
+}
+
+export function normalizeReferencePaths(reference: LearningPackConfig["reference"]) {
+  const normalizedPaths: string[] = []
+
+  if (typeof reference.path === "string" && reference.path.trim()) {
+    normalizedPaths.push(reference.path.trim())
+  }
+  if (Array.isArray(reference.paths)) {
+    for (const value of reference.paths) {
+      if (typeof value === "string" && value.trim()) {
+        normalizedPaths.push(value.trim())
+      }
+    }
+  }
+
+  return normalizedPaths
+}
+
+export function getPrimaryReferencePath(reference: LearningPackConfig["reference"]) {
+  return normalizeReferencePaths(reference)[0] ?? ""
+}
+
 export async function validateLearningPackConfig(config: LearningPackConfig, configFilePath?: string) {
   assert(isPlainText(config.id), "id is required")
   assert(isPlainText(config.title), "title is required")
@@ -50,7 +77,20 @@ export async function validateLearningPackConfig(config: LearningPackConfig, con
   assert(isPlainText(config.outputDir), "outputDir is required")
 
   assert(typeof config.reference?.enabled === "boolean", "reference.enabled is required")
-  assert(typeof config.reference?.path === "string", "reference.path is required")
+  assert(
+    typeof config.reference?.path === "string" || typeof config.reference?.path === "undefined",
+    "reference.path must be a string when provided",
+  )
+  assert(
+    Array.isArray(config.reference?.paths) || typeof config.reference?.paths === "undefined",
+    "reference.paths must be an array when provided",
+  )
+  if (Array.isArray(config.reference?.paths)) {
+    assert(config.reference.paths.length > 0, "reference.paths must not be empty when provided")
+    for (const value of config.reference.paths) {
+      assert(typeof value === "string", "reference.paths must contain only strings")
+    }
+  }
   assert(isPlainText(config.reference?.mode), "reference.mode is required")
 
   const isValidMode =
@@ -60,26 +100,30 @@ export async function validateLearningPackConfig(config: LearningPackConfig, con
     config.reference.mode === "exact_text_document"
   assert(isValidMode, "reference.mode must be one of none/source_only/source_plus/exact_text_document")
 
-  const referencePathTrimmed = config.reference.path.trim()
-  const hasReference = config.reference.enabled && referencePathTrimmed.length > 0
+  const referencePaths = normalizeReferencePaths(config.reference)
+  const hasReference = config.reference.enabled && referencePaths.length > 0
 
   if (config.reference.enabled) {
-    assert(referencePathTrimmed.length > 0, "reference.path is required when reference.enabled is true")
+    assert(referencePaths.length > 0, "reference.path or reference.paths is required when reference.enabled is true")
     assert(
       config.reference.mode !== "none",
       "reference.mode must be source_only/source_plus/exact_text_document when reference.enabled is true",
     )
 
-    const referenceAbsPath = resolveFrom(process.cwd(), referencePathTrimmed)
-    await access(referenceAbsPath).catch(() => {
-      throw new Error(`reference.path does not exist: ${config.reference.path}`)
-    })
+    for (const referencePath of referencePaths) {
+      assert(isSupportedReferencePath(referencePath), `Unsupported reference format: ${referencePath}`)
+      const referenceAbsPath = resolveFrom(process.cwd(), referencePath)
+      await access(referenceAbsPath).catch(() => {
+        throw new Error(`reference file does not exist: ${referencePath}`)
+      })
+    }
   } else {
     assert(config.reference.mode === "none", "reference.mode must be none when reference.enabled is false")
   }
 
   return {
     hasReference,
+    referencePaths,
   }
 }
 

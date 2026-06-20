@@ -2,8 +2,9 @@ import { readFile } from "node:fs/promises"
 import path from "node:path"
 
 import { generateLearningPack } from "../lib/learning-pack"
-import { loadLearningPackConfig, resolveFrom } from "../lib/learning-pack-config"
+import { loadLearningPackConfig } from "../lib/learning-pack-config"
 import { writeLearningPackOutput } from "../lib/learning-pack-zip"
+import { loadReferenceContext, loadReferenceFile } from "../lib/reference-loader"
 
 type CliOptions = {
   configFile?: string
@@ -48,7 +49,7 @@ function parseArgs(argv: string[]): CliOptions {
   }
   if (!options.configFile && !options.inputFile && !options.text && positional.length > 0) {
     const first = positional[0]
-    if (first.toLowerCase().endsWith(".txt") || first.toLowerCase().endsWith(".md")) {
+    if (first.toLowerCase().endsWith(".txt") || first.toLowerCase().endsWith(".md") || first.toLowerCase().endsWith(".pdf")) {
       options.inputFile = first
     } else {
       options.text = positional.join(" ")
@@ -67,10 +68,8 @@ async function main() {
 
   if (options.configFile) {
     const config = await loadLearningPackConfig(options.configFile)
-    const referenceText =
-      config.reference.enabled && config.reference.path.trim()
-        ? await readFile(resolveFrom(process.cwd(), config.reference.path.trim()), "utf8")
-        : undefined
+    const referenceContext = await loadReferenceContext(config)
+    const referenceText = referenceContext.text || undefined
 
     const pack = generateLearningPack(config, referenceText)
     if (!pack.validation.passed) {
@@ -86,7 +85,7 @@ async function main() {
   }
 
   const sourceText = options.inputFile
-    ? await loadTextFromFile(options.inputFile)
+    ? await loadReferenceFile(options.inputFile)
     : options.text?.trim()
       ? options.text
       : await loadTextFromFile("examples/customer-service.txt")

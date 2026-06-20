@@ -1,5 +1,5 @@
 ---
-title: SokQA Learning Pack Factory OSS Edition Spec v0.4
+title: SokQA Learning Pack Factory OSS Edition Spec v0.5
 ---
 
 # Learning Pack Generator Powered by Trae Skills
@@ -96,7 +96,8 @@ output/customer-service-pack/
 {
   "id": "customer-service-pack",
   "title": "Customer Service Training",
-  "version": "0.4.0",
+  "version": "0.5.0",
+  "references": ["manual.txt", "faq.md", "policy.pdf"],
   "documents": ["doc_01.json", "doc_02.json", "doc_03.json"],
   "quizzes": ["quiz_01.json", "quiz_02.json"]
 }
@@ -134,8 +135,27 @@ output/customer-service-pack/
 - `createdAt`
 - `generator`
 - `version`
+- `source.hasReference`
+- `source.mode`
+- `source.path`
+- `references`
 - `documents`
 - `quizzes`
+
+## Reference仕様
+
+- `reference.path` は後方互換として維持する
+- `reference.paths` で複数資料入力を受け付ける
+- 対応形式は `txt` / `md` / `pdf`
+- 複数資料は入力順で結合し 1 つの Reference Context として扱う
+- `metadata.references` に入力ファイル名を記録する
+
+### Reference Modes
+
+- `none`: 参照資料なし
+- `source_only`: 参照資料のみで生成
+- `source_plus`: 参照資料を中心に補足付きで生成
+- `exact_text_document`: 原文のみで document JSON 化し quiz は生成しない
 
 ## Validator方針
 
@@ -236,20 +256,24 @@ node_modules/
 
 ### v0.5
 
-- Template System
-- Restaurant
-- Hotel
-- Retail
-- IT Training
+- Multiple Reference Sources
+- PDF Reference Support
+- Markdown Reference Support
+- Multiple Reference Files
 
 ### v0.6
 
+- Output Format Improvements
+- Markdown Export
 - Validation Improvements
 - Pack Consistency Check
 
 ### v0.7
 
-- CLI Improvements
+- Generation Quality Controls
+- Difficulty Settings
+- Target Audience Settings
+- Quiz Generation Controls
 
 ## 非目標
 

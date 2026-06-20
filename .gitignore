@@ -25,6 +25,8 @@ coverage/
 output/
 references/*
 !references/customer-service-manual.txt
+!references/faq.md
+!references/policy.pdf
 
 # logs
 npm-debug.log*

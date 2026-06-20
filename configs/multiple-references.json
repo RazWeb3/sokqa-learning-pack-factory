@@ -1,0 +1,20 @@
+{
+  "id": "multi-reference-pack",
+  "title": "Customer Service Pack",
+  "description": "Example pack generated from multiple reference files.",
+  "theme": "customer service",
+  "language": "en",
+  "documentCount": 3,
+  "quizCount": 2,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/multi-reference-pack",
+  "reference": {
+    "enabled": true,
+    "paths": [
+      "references/customer-service-manual.txt",
+      "references/faq.md",
+      "references/policy.pdf"
+    ],
+    "mode": "source_plus"
+  }
+}

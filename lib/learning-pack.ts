@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto"
+import path from "node:path"
 
-import type { LearningPackConfig, ReferenceMode } from "./learning-pack-config"
+import { getPrimaryReferencePath, normalizeReferencePaths, type LearningPackConfig, type ReferenceMode } from "./learning-pack-config"
 
 export type DocumentFile = {
   id: string
@@ -42,13 +43,14 @@ export type MetadataFile = {
   description: string
   createdAt: string
   generator: "sokqa-learning-pack-factory"
-  version: "0.4.0"
+  version: "0.5.0"
   language: string
   source: {
     hasReference: boolean
     mode: ReferenceMode
     path: string
   }
+  references: string[]
   documents: string[]
   quizzes: string[]
 }
@@ -203,6 +205,7 @@ function buildMetadataFile(
   documents: DocumentFile[],
   quizzes: QuizFile[],
   source: MetadataFile["source"],
+  references: string[],
   createdAt = new Date().toISOString(),
 ): MetadataFile {
   return {
@@ -211,9 +214,10 @@ function buildMetadataFile(
     description: config.description?.trim() || "Generated learning pack",
     createdAt,
     generator: "sokqa-learning-pack-factory",
-    version: "0.4.0",
+    version: "0.5.0",
     language: config.language,
     source,
+    references,
     documents: documents.map((_, index) => buildDocumentFileName(index)),
     quizzes: quizzes.map((_, index) => buildQuizFileName(index)),
   }
@@ -425,7 +429,7 @@ function validateMetadata(payload: PackPayload) {
   if (metadata.generator !== "sokqa-learning-pack-factory") {
     throw new Error("metadata.generator is invalid")
   }
-  if (metadata.version !== "0.4.0") {
+  if (metadata.version !== "0.5.0") {
     throw new Error("metadata.version is invalid")
   }
   if (!isPlainText(metadata.language)) {
@@ -440,12 +444,25 @@ function validateMetadata(payload: PackPayload) {
   if (typeof metadata.source?.path !== "string") {
     throw new Error("metadata.source.path is required")
   }
+  if (!Array.isArray(metadata.references)) {
+    throw new Error("metadata.references is required")
+  }
   if (!metadata.source.hasReference) {
     if (metadata.source.mode !== "none") {
       throw new Error("metadata.source.mode must be none when hasReference is false")
     }
     if (metadata.source.path.trim() !== "") {
       throw new Error("metadata.source.path must be empty when hasReference is false")
+    }
+    if (metadata.references.length !== 0) {
+      throw new Error("metadata.references must be empty when hasReference is false")
+    }
+  } else if (metadata.references.length === 0) {
+    throw new Error("metadata.references must contain at least one item when hasReference is true")
+  }
+  for (const reference of metadata.references) {
+    if (!isPlainText(reference)) {
+      throw new Error("metadata.references must contain only non-empty strings")
     }
   }
 
@@ -579,16 +596,23 @@ export function generateLearningPack(configInput: LearningPackConfig, referenceT
   const config: LearningPackConfig = {
     ...configInput,
     id: normalizePackId(configInput.id || buildPackId()),
-    reference: configInput.reference ?? { enabled: false, path: "", mode: "none" },
+    reference: {
+      enabled: configInput.reference?.enabled ?? false,
+      path: configInput.reference?.path ?? "",
+      paths: configInput.reference?.paths,
+      mode: configInput.reference?.mode ?? "none",
+    },
   }
 
-  const hasReference = config.reference.enabled && config.reference.path.trim().length > 0
+  const referencePaths = normalizeReferencePaths(config.reference)
+  const hasReference = config.reference.enabled && referencePaths.length > 0
   const mode: ReferenceMode = hasReference ? config.reference.mode : "none"
   const source: MetadataFile["source"] = {
     hasReference,
     mode,
-    path: hasReference ? config.reference.path : "",
+    path: hasReference ? getPrimaryReferencePath(config.reference) : "",
   }
+  const references = hasReference ? referencePaths.map((referencePath) => path.basename(referencePath)) : []
 
   const strictReferenceText = mode === "source_only" || mode === "exact_text_document"
   const referenceValue = referenceText?.trim() || ""
@@ -642,7 +666,7 @@ export function generateLearningPack(configInput: LearningPackConfig, referenceT
     }
   }
 
-  const metadata = buildMetadataFile(config, documents, quizzes, source, createdAt)
+  const metadata = buildMetadataFile(config, documents, quizzes, source, references, createdAt)
   const validation = validateLearningPack(
     { documents, quizzes, metadata },
     { documentCount, quizCount, questionsPerQuiz, mode },

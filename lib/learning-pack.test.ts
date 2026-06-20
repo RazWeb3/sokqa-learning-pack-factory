@@ -8,6 +8,7 @@ import { generateLearningPack, validateLearningPack } from "./learning-pack"
 import type { LearningPackConfig } from "./learning-pack-config"
 import { buildLearningPackZipBytes, writeLearningPackOutput } from "./learning-pack-zip"
 import { loadLearningPackConfig, resolveFrom, validateLearningPackConfig } from "./learning-pack-config"
+import { loadReferenceContext, loadReferenceFile } from "./reference-loader"
 
 function splitNonEmptyLines(text: string) {
   return text
@@ -31,6 +32,11 @@ function buildConfig(overrides: Partial<LearningPackConfig> = {}): LearningPackC
     reference: baseReference,
     ...overrides,
   }
+}
+
+async function loadReferenceText(config: LearningPackConfig) {
+  const referenceContext = await loadReferenceContext(config)
+  return referenceContext.text
 }
 
 async function readZipFileNames(pack: ReturnType<typeof generateLearningPack>) {
@@ -171,7 +177,7 @@ describe("learning pack", () => {
 
   it("validates and generates in source_only mode without adding non-reference strings", async () => {
     const config = await loadLearningPackConfig("configs/customer-service-source-only.json")
-    const referenceText = await readFile(resolveFrom(process.cwd(), config.reference.path), "utf8")
+    const referenceText = await loadReferenceText(config)
     const referenceLines = splitNonEmptyLines(referenceText)
     const pack = generateLearningPack(
       {
@@ -189,6 +195,7 @@ describe("learning pack", () => {
       mode: "source_only",
       path: config.reference.path,
     })
+    expect(pack.metadata.references).toEqual(["customer-service-manual.txt"])
     expect(pack.documents).toHaveLength(2)
     expect(pack.quizzes).toHaveLength(2)
 
@@ -217,7 +224,7 @@ describe("learning pack", () => {
 
   it("validates and generates in source_plus mode with multiple outputs", async () => {
     const config = await loadLearningPackConfig("configs/customer-service-source-plus.json")
-    const referenceText = await readFile(resolveFrom(process.cwd(), config.reference.path), "utf8")
+    const referenceText = await loadReferenceText(config)
     const pack = generateLearningPack(
       {
         ...config,
@@ -230,6 +237,7 @@ describe("learning pack", () => {
 
     expect(pack.validation.passed).toBe(true)
     expect(pack.metadata.source.mode).toBe("source_plus")
+    expect(pack.metadata.references).toEqual(["customer-service-manual.txt"])
     expect(pack.documents).toHaveLength(2)
     expect(pack.quizzes).toHaveLength(2)
     expect(pack.quizzes.every((quiz) => quiz.questions.length === 3)).toBe(true)
@@ -238,7 +246,7 @@ describe("learning pack", () => {
   it("does not generate quiz files in exact_text_document mode even when quizCount is set", async () => {
     const outputDir = await mkdtemp(path.join(os.tmpdir(), "sokqa-pack-"))
     const config = await loadLearningPackConfig("configs/customer-service-exact-text.json")
-    const referenceText = await readFile(resolveFrom(process.cwd(), config.reference.path), "utf8")
+    const referenceText = await loadReferenceText(config)
     const pack = generateLearningPack(
       {
         ...config,
@@ -259,6 +267,68 @@ describe("learning pack", () => {
       const files = (await readdir(exportResult.packDirectory)).sort()
       expect(files).toEqual(["doc_01.json", "learning-pack.zip", "metadata.json"])
       expect(await readZipFileNames(pack)).toEqual(["doc_01.json", "metadata.json"])
+    } finally {
+      await rm(outputDir, { recursive: true, force: true })
+    }
+  })
+
+  it("loads txt references", async () => {
+    const text = await loadReferenceFile("references/customer-service-manual.txt")
+
+    expect(text).toContain("Smile and greet the customer clearly.")
+  })
+
+  it("loads markdown references", async () => {
+    const text = await loadReferenceFile("references/faq.md")
+
+    expect(text).toContain("# FAQ")
+    expect(text).toContain("How should staff respond to refund requests?")
+  })
+
+  it("loads pdf references", async () => {
+    const text = await loadReferenceFile("references/policy.pdf")
+
+    expect(text).toContain("Refund policy: Verify customer identity before approval.")
+    expect(text).toContain("Escalate exceptions to the store manager.")
+  })
+
+  it("combines multiple references in order and records them in metadata", async () => {
+    const config = await loadLearningPackConfig("configs/multiple-references.json")
+    const referenceText = await loadReferenceText(config)
+    const pack = generateLearningPack(config, referenceText)
+
+    expect(referenceText).toContain("Smile and greet the customer clearly.")
+    expect(referenceText).toContain("# FAQ")
+    expect(referenceText).toContain("Refund policy: Verify customer identity before approval.")
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.source).toEqual({
+      hasReference: true,
+      mode: "source_plus",
+      path: "references/customer-service-manual.txt",
+    })
+    expect(pack.metadata.references).toEqual(["customer-service-manual.txt", "faq.md", "policy.pdf"])
+  })
+
+  it("keeps metadata references in exported multiple-reference zip output", async () => {
+    const outputDir = await mkdtemp(path.join(os.tmpdir(), "sokqa-pack-"))
+    const config = await loadLearningPackConfig("configs/multiple-references.json")
+    const referenceText = await loadReferenceText(config)
+    const pack = generateLearningPack(
+      {
+        ...config,
+        outputDir,
+      },
+      referenceText,
+    )
+
+    try {
+      const exportResult = await writeLearningPackOutput(pack, outputDir)
+      const metadataText = await readFile(path.join(exportResult.packDirectory, "metadata.json"), "utf8")
+      const metadata = JSON.parse(metadataText) as typeof pack.metadata
+
+      expect(metadata.references).toEqual(["customer-service-manual.txt", "faq.md", "policy.pdf"])
+      expect(await readZipFileNames(pack)).toEqual(["doc_01.json", "doc_02.json", "doc_03.json", "metadata.json", "quiz_01.json", "quiz_02.json"])
+      await expect(stat(path.join(exportResult.packDirectory, "learning-pack.zip"))).resolves.toBeDefined()
     } finally {
       await rm(outputDir, { recursive: true, force: true })
     }
@@ -293,18 +363,18 @@ describe("learning pack", () => {
     ).rejects.toThrow("questionsPerQuiz must be >= 1")
   })
 
-  it("throws when reference.enabled=true and reference.path is empty", async () => {
+  it("throws when reference.enabled=true and both reference.path and reference.paths are empty", async () => {
     await expect(
       validateLearningPackConfig(
         buildConfig({
           id: "bad-reference-pack",
-          reference: { enabled: true, path: "", mode: "source_only" },
+          reference: { enabled: true, path: "", paths: [], mode: "source_only" },
         }),
       ),
-    ).rejects.toThrow("reference.path is required when reference.enabled is true")
+    ).rejects.toThrow("reference.paths must not be empty when provided")
   })
 
-  it("throws when reference.path does not exist", async () => {
+  it("throws when reference file does not exist", async () => {
     await expect(
       validateLearningPackConfig(
         buildConfig({
@@ -313,7 +383,29 @@ describe("learning pack", () => {
         }),
         path.resolve(process.cwd(), "configs/_tmp.json"),
       ),
-    ).rejects.toThrow("reference.path does not exist")
+    ).rejects.toThrow("reference file does not exist")
+  })
+
+  it("throws when reference.paths is empty", async () => {
+    await expect(
+      validateLearningPackConfig(
+        buildConfig({
+          id: "empty-reference-paths-pack",
+          reference: { enabled: true, paths: [], mode: "source_only" },
+        }),
+      ),
+    ).rejects.toThrow("reference.paths must not be empty when provided")
+  })
+
+  it("throws when an unsupported reference format is configured", async () => {
+    await expect(
+      validateLearningPackConfig(
+        buildConfig({
+          id: "unsupported-reference-pack",
+          reference: { enabled: true, paths: ["references/unsupported.docx"], mode: "source_only" },
+        }),
+      ),
+    ).rejects.toThrow("Unsupported reference format")
   })
 
   it("loads the multiple-docs-quizzes example config", async () => {
@@ -323,5 +415,16 @@ describe("learning pack", () => {
     expect(config.documentCount).toBe(3)
     expect(config.quizCount).toBe(2)
     expect(config.questionsPerQuiz).toBe(5)
+  })
+
+  it("loads the multiple-references example config", async () => {
+    const config = await loadLearningPackConfig("configs/multiple-references.json")
+
+    expect(config.id).toBe("multi-reference-pack")
+    expect(config.reference.paths).toEqual([
+      "references/customer-service-manual.txt",
+      "references/faq.md",
+      "references/policy.pdf",
+    ])
   })
 })

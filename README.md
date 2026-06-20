@@ -116,6 +116,7 @@ By editing the config JSON, you can change:
 - outputDir
 - reference.enabled
 - reference.path
+- reference.paths
 - reference.mode
 
 ## Reference Modes
@@ -161,6 +162,22 @@ With reference:
 }
 ```
 
+With multiple references:
+
+```json
+{
+  "reference": {
+    "enabled": true,
+    "paths": [
+      "references/customer-service-manual.txt",
+      "references/faq.md",
+      "references/policy.pdf"
+    ],
+    "mode": "source_plus"
+  }
+}
+```
+
 Without reference:
 
 ```json
@@ -170,6 +187,24 @@ Without reference:
     "path": "",
     "mode": "none"
   }
+}
+```
+
+## Supported Reference Formats
+
+- `txt`
+- `md`
+- `pdf`
+
+## Multiple Reference Files
+
+Multiple reference files are merged in the configured order and passed into generation as one reference context.
+
+Generated `metadata.json` records the input sources:
+
+```json
+{
+  "references": ["customer-service-manual.txt", "faq.md", "policy.pdf"]
 }
 ```
 
@@ -190,6 +225,9 @@ configs/customer-service-exact-text.json
 
 configs/multiple-docs-quizzes.json
   Generate 3 documents and 2 quiz packs from config
+
+configs/multiple-references.json
+  Generate from txt + md + pdf reference files
 ```
 
 ## Generate
@@ -200,6 +238,7 @@ npm run generate -- --config configs/customer-service-source-only.json
 npm run generate -- --config configs/customer-service-source-plus.json
 npm run generate -- --config configs/customer-service-exact-text.json
 npm run generate -- --config configs/multiple-docs-quizzes.json
+npm run generate -- --config configs/multiple-references.json
 ```
 
 Multiple document / quiz example:
@@ -223,6 +262,7 @@ Ad-hoc input (non-config):
 
 ```bash
 npm run generate -- --input examples/customer-service.txt
+npm run generate -- --input references/policy.pdf
 npm run generate -- --text "Customer service basics..."
 ```
 
@@ -245,9 +285,14 @@ Validation covers:
 - `documentCount >= 1`
 - `quizCount >= 0`
 - `questionsPerQuiz >= 1`
+- reference file existence
+- supported reference format (`txt` / `md` / `pdf`)
+- `reference.paths` must not be empty
+- PDF read failures
 - generated document / quiz counts
 - per-quiz question counts
 - metadata file list consistency
+- metadata reference source consistency
 - ZIP file list consistency
 - `exact_text_document` quiz suppression
 
@@ -286,17 +331,23 @@ v0.4 (implemented)
 - questionsPerQuiz-driven quiz output
 - metadata / ZIP consistency checks
 
-v0.5
-- Template system
-  - Restaurant
-  - Hotel
-  - Retail
-  - IT Training
+v0.5 (implemented)
+- Multiple reference sources
+- PDF reference support
+- Markdown reference support
+- Multiple reference files
 
 v0.6
+- Output format improvements
+- Markdown export
 - Validation improvements
 - Pack consistency checks
-- CLI improvements
+
+v0.7
+- Generation quality controls
+- Difficulty settings
+- Target audience settings
+- Quiz generation controls
 ```
 
 ## License
@@ -310,3 +361,29 @@ See LICENSE for details.
 Issues and pull requests are welcome.
 
 If you find bugs, validation problems, or ideas for improving learning pack generation, please open an issue.
+
+## Release History
+
+### v0.5.0
+
+- Multiple reference files
+- PDF support
+- Markdown support
+- Multiple reference sources
+
+### v0.4.0
+
+- Multiple documents
+- Multiple quiz packs
+- questionsPerQuiz-driven quiz output
+
+### v0.3.0
+
+- Config-driven generation
+- Reference modes
+- Exact text document mode
+
+### v0.2.0
+
+- ZIP export
+- OSS cleanup
