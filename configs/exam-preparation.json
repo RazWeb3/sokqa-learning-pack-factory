@@ -1,0 +1,24 @@
+{
+  "id": "exam-preparation-pack",
+  "title": "Exam Preparation Pack",
+  "description": "Exam preparation pack with hard difficulty and detailed explanations.",
+  "theme": "customer service for convenience store staff",
+  "language": "en",
+  "documentCount": 1,
+  "quizCount": 1,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/exam-preparation-pack",
+  "targetUser": "student",
+  "difficulty": "hard",
+  "learningStyle": "quiz",
+  "outputMode": "exam",
+  "tone": "professional",
+  "detailLevel": "detailed",
+  "exampleLevel": "few",
+  "audioOptimization": false,
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}

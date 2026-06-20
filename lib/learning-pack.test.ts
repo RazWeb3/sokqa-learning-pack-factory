@@ -212,7 +212,10 @@ describe("learning pack", () => {
         expect(referenceLines).toContain(question.question)
         expect(referenceLines).toContain(question.explanation)
         expect(referenceLines).toContain(question.tts.questionText)
-        expect(referenceLines).toContain(question.tts.choicesText)
+        expect(question.tts.choiceTexts).toHaveLength(4)
+        for (const choiceText of question.tts.choiceTexts) {
+          expect(referenceLines).toContain(choiceText)
+        }
         expect(referenceLines).toContain(question.tts.answerText)
         expect(referenceLines).toContain(question.tts.explanationText)
         for (const choice of question.choices) {
@@ -426,5 +429,135 @@ describe("learning pack", () => {
       "references/faq.md",
       "references/policy.pdf",
     ])
+  })
+
+  it("rejects invalid targetUser", async () => {
+    await expect(
+      validateLearningPackConfig(
+        buildConfig({
+          id: "bad-profile-user",
+          targetUser: "invalid" as LearningPackConfig["targetUser"],
+        }),
+      ),
+    ).rejects.toThrow("targetUser must be one of")
+  })
+
+  it("rejects invalid difficulty", async () => {
+    await expect(
+      validateLearningPackConfig(
+        buildConfig({
+          id: "bad-profile-diff",
+          difficulty: "extreme" as LearningPackConfig["difficulty"],
+        }),
+      ),
+    ).rejects.toThrow("difficulty must be one of")
+  })
+
+  it("rejects invalid audioOptimization", async () => {
+    await expect(
+      validateLearningPackConfig(
+        buildConfig({
+          id: "bad-audio",
+          audioOptimization: "yes" as unknown as boolean,
+        }),
+      ),
+    ).rejects.toThrow("audioOptimization must be a boolean")
+  })
+
+  it("generates a beginner audio profile pack", async () => {
+    const config = await loadLearningPackConfig("configs/beginner-audio.json")
+    const pack = generateLearningPack(config)
+
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.profile).toEqual({
+      targetUser: "beginner",
+      difficulty: "easy",
+      learningStyle: "audio",
+      outputMode: "study",
+      tone: "friendly",
+      detailLevel: "short",
+      exampleLevel: "few",
+      audioOptimization: true,
+    })
+    expect(pack.documents).toHaveLength(1)
+    expect(pack.quizzes).toHaveLength(1)
+    // Beginner audio: question should use the friendly template
+    expect(pack.quizzes[0].questions[0].question).toContain("customer service")
+    // choiceTexts must exist and have 4 items without numbers
+    for (const question of pack.quizzes[0].questions) {
+      expect(question.tts.choiceTexts).toHaveLength(4)
+      for (const choiceText of question.tts.choiceTexts) {
+        expect(choiceText).not.toMatch(/(\d+\s*番|option\s*\d+|choice\s*\d+|no\.?\s*\d+)/i)
+      }
+    }
+  })
+
+  it("generates an employee training profile pack", async () => {
+    const config = await loadLearningPackConfig("configs/employee-training.json")
+    const pack = generateLearningPack(config)
+
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.profile.targetUser).toBe("employee")
+    expect(pack.metadata.profile.outputMode).toBe("training")
+    expect(pack.metadata.profile.tone).toBe("professional")
+    expect(pack.metadata.profile.exampleLevel).toBe("many")
+  })
+
+  it("generates an exam preparation profile pack", async () => {
+    const config = await loadLearningPackConfig("configs/exam-preparation.json")
+    const pack = generateLearningPack(config)
+
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.profile.targetUser).toBe("student")
+    expect(pack.metadata.profile.difficulty).toBe("hard")
+    expect(pack.metadata.profile.outputMode).toBe("exam")
+    expect(pack.metadata.profile.detailLevel).toBe("detailed")
+    // Exam mode: questions should use numbered format
+    expect(pack.quizzes[0].questions[0].question).toMatch(/Question \d+ of \d+/)
+  })
+
+  it("generates an academic reading profile pack", async () => {
+    const config = await loadLearningPackConfig("configs/academic-reading.json")
+    const pack = generateLearningPack(config)
+
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.profile.targetUser).toBe("student")
+    expect(pack.metadata.profile.learningStyle).toBe("reading")
+    expect(pack.metadata.profile.tone).toBe("academic")
+    expect(pack.metadata.profile.detailLevel).toBe("detailed")
+    expect(pack.metadata.profile.exampleLevel).toBe("many")
+  })
+
+  it("applies default profile when no profile settings are provided", () => {
+    const pack = generateLearningPack(buildConfig({ id: "default-profile-pack" }))
+
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.profile).toEqual({
+      targetUser: "general",
+      difficulty: "normal",
+      learningStyle: "balanced",
+      outputMode: "study",
+      tone: "friendly",
+      detailLevel: "normal",
+      exampleLevel: "few",
+      audioOptimization: false,
+    })
+  })
+
+  it("detects choice numbers in choiceTexts as validation failure", () => {
+    const pack = generateLearningPack(buildConfig({ id: "choice-number-check" }))
+    const invalidPack = structuredClone(pack)
+
+    invalidPack.quizzes[0].questions[0].tts.choiceTexts = [
+      "1番 Reliable",
+      "2番 Responsible",
+      "3番 Reasonable",
+      "4番 Respectable",
+    ] as unknown as [string, string, string, string]
+
+    const validation = validateLearningPack(invalidPack)
+
+    expect(validation.passed).toBe(false)
+    expect(validation.errors.some((error) => error.includes("choiceTexts must not contain choice numbers"))).toBe(true)
   })
 })

@@ -1,7 +1,14 @@
 import { randomUUID } from "node:crypto"
 import path from "node:path"
 
-import { getPrimaryReferencePath, normalizeReferencePaths, type LearningPackConfig, type ReferenceMode } from "./learning-pack-config"
+import {
+  getPrimaryReferencePath,
+  normalizeReferencePaths,
+  resolveProfile,
+  type GenerationProfile,
+  type LearningPackConfig,
+  type ReferenceMode,
+} from "./learning-pack-config"
 
 export type DocumentFile = {
   id: string
@@ -30,7 +37,7 @@ export type QuizFile = {
     explanation: string
     tts: {
       questionText: string
-      choicesText: string
+      choiceTexts: [string, string, string, string]
       answerText: string
       explanationText: string
     }
@@ -43,13 +50,14 @@ export type MetadataFile = {
   description: string
   createdAt: string
   generator: "sokqa-learning-pack-factory"
-  version: "0.5.0"
+  version: "0.6.0"
   language: string
   source: {
     hasReference: boolean
     mode: ReferenceMode
     path: string
   }
+  profile: Required<GenerationProfile>
   references: string[]
   documents: string[]
   quizzes: string[]
@@ -82,6 +90,9 @@ type ValidationExpectations = {
   questionsPerQuiz: number
   mode: ReferenceMode
 }
+
+// choiceTexts must never include numbers like "1番", "Option 1", "Choice 1", "No.1".
+const NUMBER_READING_PATTERN = /(^|\s)(\d+\s*番|option\s*\d+|choice\s*\d+|no\.?\s*\d+)(\s|$)/i
 
 function ensureEndsWithComma(text: string) {
   const trimmed = text.trim()
@@ -164,6 +175,121 @@ function chunkEvenly<T>(items: T[], chunkCount: number) {
   return chunks
 }
 
+type ProfileAdapter = {
+  isAudioOptimized: boolean
+  detailLabel: string
+  audienceLabel: string
+  toneLabel: string
+  exampleCount: number
+  intro: string
+  summary: (theme: string) => string
+  practice: string
+  explanationPrefix: string
+  quizQuestionTemplate: (theme: string, index: number, total: number) => string
+  choiceA: (theme: string) => string
+  choiceB: string
+  choiceC: string
+  choiceD: string
+  explanationTemplate: (theme: string) => string
+}
+
+function buildProfileAdapter(profile: Required<GenerationProfile>): ProfileAdapter {
+  const isAudioOptimized = profile.audioOptimization || profile.learningStyle === "audio"
+
+  const detailLabels: Record<string, string> = {
+    short: "Key Point",
+    normal: "Detail",
+    detailed: "Deep Dive",
+  }
+  const audienceLabels: Record<string, string> = {
+    beginner: "Beginner",
+    student: "Student",
+    employee: "Employee",
+    manager: "Manager",
+    general: "Learner",
+  }
+  const toneLabels: Record<string, string> = {
+    friendly: "Friendly",
+    professional: "Professional",
+    academic: "Academic",
+  }
+
+  const exampleCountByLevel = { none: 0, few: 1, many: 3 } as const
+
+  const introByTone: Record<string, string> = {
+    friendly: "Let's learn together.",
+    professional: "Please review the following guidance.",
+    academic: "Consider the following material for study.",
+  }
+  const summaryByTone: Record<string, (theme: string) => string> = {
+    friendly: (theme) => `Nice work! You covered ${theme}.`,
+    professional: (theme) => `Summary: This training covered ${theme}.`,
+    academic: (theme) => `In summary, the material addressed ${theme}.`,
+  }
+  const practiceByMode: Record<string, string> = {
+    study: "Study Tip: Reread the key points and answer the quiz.",
+    training: "On-the-job Tip: Apply these points in your next task.",
+    exam: "Exam Tip: Memorize the key points and rehearse with the quiz.",
+  }
+  const explanationPrefixByAudience: Record<string, string> = {
+    beginner: "Why: ",
+    student: "Reason: ",
+    employee: "Rationale: ",
+    manager: "Business rationale: ",
+    general: "Explanation: ",
+  }
+
+  return {
+    isAudioOptimized,
+    detailLabel: detailLabels[profile.detailLevel],
+    audienceLabel: audienceLabels[profile.targetUser],
+    toneLabel: toneLabels[profile.tone],
+    exampleCount: exampleCountByLevel[profile.exampleLevel],
+    intro: introByTone[profile.tone],
+    summary: summaryByTone[profile.tone],
+    practice: practiceByMode[profile.outputMode],
+    explanationPrefix: explanationPrefixByAudience[profile.targetUser],
+    quizQuestionTemplate: (theme, index, total) => {
+      if (profile.outputMode === "exam") {
+        return `Question ${index + 1} of ${total}: Select the best option regarding ${theme}.`
+      }
+      return `Which choice best aligns with the theme: ${theme}?`
+    },
+    choiceA: (theme) => {
+      if (profile.difficulty === "hard") {
+        return `Apply best practice for ${theme} in a real scenario`
+      }
+      if (profile.difficulty === "easy") {
+        return `Focus on the basics of ${theme}`
+      }
+      return `Focus on ${theme}`
+    },
+    choiceB: "Ignore customer context",
+    choiceC: "Skip confirmation steps",
+    choiceD: "Use unclear language",
+    explanationTemplate: (theme) => {
+      const prefix = explanationPrefixByAudience[profile.targetUser]
+      if (profile.detailLevel === "detailed") {
+        return `${prefix}This option directly aligns with ${theme} and reflects the recommended approach covered in the document.`
+      }
+      if (profile.detailLevel === "short") {
+        return `${prefix}Matches ${theme}.`
+      }
+      return `${prefix}It directly matches the theme: ${theme}.`
+    },
+  }
+}
+
+function shortenForAudio(text: string, isAudioOptimized: boolean) {
+  if (!isAudioOptimized) {
+    return text
+  }
+  // Audio optimization: split very long sentences at the first clause boundary.
+  const firstClause = text.split(/[.。:：]/)[0]
+  const candidate = firstClause.trim()
+  return candidate.length >= 12 ? candidate : text
+}
+
 function buildDocumentFile(
   config: LearningPackConfig,
   docIndex: number,
@@ -206,6 +332,7 @@ function buildMetadataFile(
   quizzes: QuizFile[],
   source: MetadataFile["source"],
   references: string[],
+  profile: Required<GenerationProfile>,
   createdAt = new Date().toISOString(),
 ): MetadataFile {
   return {
@@ -214,25 +341,71 @@ function buildMetadataFile(
     description: config.description?.trim() || "Generated learning pack",
     createdAt,
     generator: "sokqa-learning-pack-factory",
-    version: "0.5.0",
+    version: "0.6.0",
     language: config.language,
     source,
+    profile,
     references,
     documents: documents.map((_, index) => buildDocumentFileName(index)),
     quizzes: quizzes.map((_, index) => buildQuizFileName(index)),
   }
 }
 
-function buildGenericDocumentItems(config: LearningPackConfig, strict: boolean) {
+function buildGenericDocumentItems(config: LearningPackConfig, adapter: ProfileAdapter, strict: boolean) {
+  const items: Array<{ text: string; ttsText: string }> = []
+
+  items.push({
+    text: `Intro (${adapter.toneLabel}): ${adapter.intro}`,
+    ttsText: strict ? `Intro (${adapter.toneLabel}): ${adapter.intro}` : ensureEndsWithComma(toTts(config.language, `Intro: ${adapter.intro}`)),
+  })
+
   const base = [
     `Theme: ${config.theme}`,
     `Goal: ${config.title}`,
     `Key Points: ${config.description?.trim() || config.theme}`,
   ]
-  return base.map((text) => ({
-    text,
-    ttsText: strict ? text : ensureEndsWithComma(toTts(config.language, text)),
-  }))
+  for (const text of base) {
+    items.push({
+      text,
+      ttsText: strict ? text : ensureEndsWithComma(toTts(config.language, text)),
+    })
+  }
+
+  // detailLevel adds deeper explanation sections
+  if (adapter.detailLabel === "Deep Dive" || adapter.detailLabel === "Detail") {
+    const detailText = `${adapter.detailLabel}: This pack is designed for ${adapter.audienceLabel.toLowerCase()} learners.`
+    items.push({
+      text: detailText,
+      ttsText: strict ? detailText : ensureEndsWithComma(toTts(config.language, detailText)),
+    })
+  }
+
+  // exampleLevel adds example sections
+  for (let i = 0; i < adapter.exampleCount; i += 1) {
+    const text = `Example ${i + 1}: Apply ${config.theme} to a practical scenario.`
+    items.push({
+      text,
+      ttsText: strict ? text : ensureEndsWithComma(toTts(config.language, text)),
+    })
+  }
+
+  items.push({
+    text: adapter.summary(config.theme),
+    ttsText: strict ? adapter.summary(config.theme) : ensureEndsWithComma(toTts(config.language, adapter.summary(config.theme))),
+  })
+  items.push({
+    text: adapter.practice,
+    ttsText: strict ? adapter.practice : ensureEndsWithComma(toTts(config.language, adapter.practice)),
+  })
+
+  if (adapter.isAudioOptimized) {
+    return items.map((item) => ({
+      text: shortenForAudio(item.text, true),
+      ttsText: shortenForAudio(item.ttsText, true),
+    }))
+  }
+
+  return items
 }
 
 function buildSourceOnlyDocumentItems(lines: string[]) {
@@ -243,7 +416,7 @@ function buildSourceOnlyDocumentItems(lines: string[]) {
   return items
 }
 
-function buildSourcePlusDocumentItems(config: LearningPackConfig, lines: string[]) {
+function buildSourcePlusDocumentItems(config: LearningPackConfig, adapter: ProfileAdapter, lines: string[]) {
   const sourceLines = lines.slice(0, 6)
   const items: Array<{ text: string; ttsText: string }> = []
 
@@ -251,13 +424,22 @@ function buildSourcePlusDocumentItems(config: LearningPackConfig, lines: string[
     items.push({ text: line, ttsText: ensureEndsWithComma(toTts(config.language, line)) })
   }
 
-  const supplement = [
-    `Summary: This pack covers ${config.theme}.`,
-    "Practice: Read the examples aloud and answer the quiz questions.",
-  ]
-  for (const text of supplement) {
-    items.push({ text, ttsText: ensureEndsWithComma(toTts(config.language, text)) })
+  items.push({
+    text: `Summary (${adapter.toneLabel}): ${adapter.summary(config.theme)}`,
+    ttsText: ensureEndsWithComma(toTts(config.language, adapter.summary(config.theme))),
+  })
+  items.push({
+    text: adapter.practice,
+    ttsText: ensureEndsWithComma(toTts(config.language, adapter.practice)),
+  })
+
+  if (adapter.isAudioOptimized) {
+    return items.map((item) => ({
+      text: shortenForAudio(item.text, true),
+      ttsText: shortenForAudio(item.ttsText, true),
+    }))
   }
+
   return items
 }
 
@@ -269,33 +451,43 @@ function buildExactTextDocumentItems(paragraphs: string[]) {
   return items
 }
 
-function buildGenericQuizQuestions(config: LearningPackConfig, count: number): QuizFile["questions"] {
+function buildQuizTts(config: LearningPackConfig, question: string, choices: [string, string, string, string], answer: string, explanation: string) {
+  // choiceTexts is a 4-item array mirroring choices, WITHOUT choice numbers.
+  // App-side handles numbering. Never embed "1番", "Option 1", etc.
+  const choiceTexts = choices.map((choice) => ensureEndsWithComma(toTts(config.language, choice))) as [string, string, string, string]
+  return {
+    questionText: ensureEndsWithComma(toTts(config.language, question)),
+    choiceTexts,
+    answerText: ensureEndsWithComma(toTts(config.language, `Answer: ${answer}.`)),
+    explanationText: ensureEndsWithComma(toTts(config.language, `Explanation: ${explanation}`)),
+  }
+}
+
+function buildGenericQuizQuestions(config: LearningPackConfig, adapter: ProfileAdapter, count: number): QuizFile["questions"] {
   const questions: QuizFile["questions"] = []
   for (let index = 0; index < count; index += 1) {
     const choices: [string, string, string, string] = [
-      `Focus on ${config.theme}`,
-      "Ignore customer context",
-      "Skip confirmation steps",
-      "Use unclear language",
+      adapter.choiceA(config.theme),
+      adapter.choiceB,
+      adapter.choiceC,
+      adapter.choiceD,
     ]
+    const question = adapter.quizQuestionTemplate(config.theme, index, count)
+    const explanation = adapter.explanationTemplate(config.theme)
+
     questions.push({
       id: `q-${index + 1}`,
-      question: `Which choice best aligns with the theme: ${config.theme}?`,
+      question,
       choices,
       answerIndex: 0,
-      explanation: `It directly matches the theme: ${config.theme}.`,
-      tts: {
-        questionText: ensureEndsWithComma(toTts(config.language, `Which choice best aligns with the theme: ${config.theme}?`)),
-        choicesText: ensureEndsWithComma(toTts(config.language, `1 ${choices[0]}. 2 ${choices[1]}. 3 ${choices[2]}. 4 ${choices[3]}.`)),
-        answerText: ensureEndsWithComma(toTts(config.language, `Answer: ${choices[0]}.`)),
-        explanationText: ensureEndsWithComma(toTts(config.language, `Explanation: It matches the theme.`)),
-      },
+      explanation,
+      tts: buildQuizTts(config, question, choices, choices[0], explanation),
     })
   }
   return questions
 }
 
-function buildSourceOnlyQuizQuestions(lines: string[], count: number): QuizFile["questions"] {
+function buildSourceOnlyQuizQuestions(config: LearningPackConfig, lines: string[], count: number): QuizFile["questions"] {
   if (lines.length === 0) {
     throw new Error("reference must contain at least one non-empty line for source_only quizzes")
   }
@@ -316,7 +508,7 @@ function buildSourceOnlyQuizQuestions(lines: string[], count: number): QuizFile[
       explanation: a,
       tts: {
         questionText: a,
-        choicesText: b,
+        choiceTexts: [a, b, c, d] as [string, string, string, string],
         answerText: a,
         explanationText: a,
       },
@@ -399,8 +591,16 @@ function validateQuiz(quiz: QuizFile) {
     if (!isPlainText(question.tts?.questionText)) {
       throw new Error(`quiz tts.questionText is required: ${question.id}`)
     }
-    if (!isPlainText(question.tts?.choicesText)) {
-      throw new Error(`quiz tts.choicesText is required: ${question.id}`)
+    if (!Array.isArray(question.tts?.choiceTexts) || question.tts.choiceTexts.length !== 4) {
+      throw new Error(`quiz tts.choiceTexts must contain exactly 4 items: ${question.id}`)
+    }
+    for (const choiceText of question.tts?.choiceTexts ?? []) {
+      if (!isPlainText(choiceText)) {
+        throw new Error(`quiz tts.choiceTexts has empty entry: ${question.id}`)
+      }
+      if (NUMBER_READING_PATTERN.test(choiceText)) {
+        throw new Error(`quiz tts.choiceTexts must not contain choice numbers: ${question.id}`)
+      }
     }
     if (!isPlainText(question.tts?.answerText)) {
       throw new Error(`quiz tts.answerText is required: ${question.id}`)
@@ -429,7 +629,7 @@ function validateMetadata(payload: PackPayload) {
   if (metadata.generator !== "sokqa-learning-pack-factory") {
     throw new Error("metadata.generator is invalid")
   }
-  if (metadata.version !== "0.5.0") {
+  if (metadata.version !== "0.6.0") {
     throw new Error("metadata.version is invalid")
   }
   if (!isPlainText(metadata.language)) {
@@ -465,6 +665,19 @@ function validateMetadata(payload: PackPayload) {
       throw new Error("metadata.references must contain only non-empty strings")
     }
   }
+
+  if (!metadata.profile || typeof metadata.profile !== "object") {
+    throw new Error("metadata.profile is required")
+  }
+  const profile = metadata.profile as Required<GenerationProfile>
+  if (typeof profile.targetUser !== "string") throw new Error("metadata.profile.targetUser is required")
+  if (typeof profile.difficulty !== "string") throw new Error("metadata.profile.difficulty is required")
+  if (typeof profile.learningStyle !== "string") throw new Error("metadata.profile.learningStyle is required")
+  if (typeof profile.outputMode !== "string") throw new Error("metadata.profile.outputMode is required")
+  if (typeof profile.tone !== "string") throw new Error("metadata.profile.tone is required")
+  if (typeof profile.detailLevel !== "string") throw new Error("metadata.profile.detailLevel is required")
+  if (typeof profile.exampleLevel !== "string") throw new Error("metadata.profile.exampleLevel is required")
+  if (typeof profile.audioOptimization !== "boolean") throw new Error("metadata.profile.audioOptimization is required")
 
   for (const document of documents) {
     if (document.language !== metadata.language) {
@@ -604,6 +817,9 @@ export function generateLearningPack(configInput: LearningPackConfig, referenceT
     },
   }
 
+  const profile = resolveProfile(config)
+  const adapter = buildProfileAdapter(profile)
+
   const referencePaths = normalizeReferencePaths(config.reference)
   const hasReference = config.reference.enabled && referencePaths.length > 0
   const mode: ReferenceMode = hasReference ? config.reference.mode : "none"
@@ -640,11 +856,11 @@ export function generateLearningPack(configInput: LearningPackConfig, referenceT
   } else if (mode === "source_plus") {
     const lines = splitNonEmptyLines(referenceValue)
     for (let index = 0; index < documentCount; index += 1) {
-      documents.push(buildDocumentFile(config, index, buildSourcePlusDocumentItems(config, lines)))
+      documents.push(buildDocumentFile(config, index, buildSourcePlusDocumentItems(config, adapter, lines)))
     }
   } else {
     for (let index = 0; index < documentCount; index += 1) {
-      documents.push(buildDocumentFile(config, index, buildGenericDocumentItems(config, strictReferenceText)))
+      documents.push(buildDocumentFile(config, index, buildGenericDocumentItems(config, adapter, strictReferenceText)))
     }
   }
 
@@ -653,20 +869,16 @@ export function generateLearningPack(configInput: LearningPackConfig, referenceT
     if (mode === "source_only") {
       const lines = splitNonEmptyLines(referenceValue)
       for (let index = 0; index < quizCount; index += 1) {
-        quizzes.push(buildQuizFile(config, index, buildSourceOnlyQuizQuestions(lines, questionsPerQuiz)))
+        quizzes.push(buildQuizFile(config, index, buildSourceOnlyQuizQuestions(config, lines, questionsPerQuiz)))
       }
     } else if (mode === "source_plus") {
-      for (let index = 0; index < quizCount; index += 1) {
-        quizzes.push(buildQuizFile(config, index, buildGenericQuizQuestions(config, questionsPerQuiz)))
-      }
+      for (let index = 0; index < quizCount; index += 1) quizzes.push(buildQuizFile(config, index, buildGenericQuizQuestions(config, adapter, questionsPerQuiz)))
     } else {
-      for (let index = 0; index < quizCount; index += 1) {
-        quizzes.push(buildQuizFile(config, index, buildGenericQuizQuestions(config, questionsPerQuiz)))
-      }
+      for (let index = 0; index < quizCount; index += 1) quizzes.push(buildQuizFile(config, index, buildGenericQuizQuestions(config, adapter, questionsPerQuiz)))
     }
   }
 
-  const metadata = buildMetadataFile(config, documents, quizzes, source, references, createdAt)
+  const metadata = buildMetadataFile(config, documents, quizzes, source, references, profile, createdAt)
   const validation = validateLearningPack(
     { documents, quizzes, metadata },
     { documentCount, quizCount, questionsPerQuiz, mode },

@@ -119,6 +119,55 @@ By editing the config JSON, you can change:
 - reference.paths
 - reference.mode
 
+## Generation Profile (v0.6)
+
+Since v0.6, the config can also control **the character of the generated content** (target audience, difficulty, tone, etc.).
+
+All profile settings are optional. When omitted, defaults are applied.
+
+| Setting | Allowed values | Default | Effect |
+|---|---|---|---|
+| `targetUser` | `beginner` / `student` / `employee` / `manager` / `general` | `general` | Vocabulary, explanation depth |
+| `difficulty` | `easy` / `normal` / `hard` | `normal` | Basics vs applied content |
+| `learningStyle` | `audio` / `reading` / `quiz` / `balanced` | `balanced` | Short sentences vs explanations |
+| `outputMode` | `study` / `training` / `exam` | `study` | Study / corporate training / exam prep |
+| `tone` | `friendly` / `professional` / `academic` | `friendly` | Wording and register |
+| `detailLevel` | `short` / `normal` / `detailed` | `normal` | Level of detail |
+| `exampleLevel` | `none` / `few` / `many` | `few` | Number of concrete examples |
+| `audioOptimization` | `true` / `false` | `false` | SokQA-friendly short sentences |
+
+Example:
+
+```json
+{
+  "targetUser": "employee",
+  "difficulty": "normal",
+  "learningStyle": "balanced",
+  "outputMode": "training",
+  "tone": "professional",
+  "detailLevel": "normal",
+  "exampleLevel": "many",
+  "audioOptimization": false
+}
+```
+
+The resolved profile is recorded in `metadata.json` under the `profile` key.
+
+## choiceTexts Rule (Quiz TTS)
+
+The app controls choice numbering, so the generator must not include numbers in `tts.choiceTexts`.
+
+- `tts.choiceTexts` is a 4-item array mirroring `choices` in the same order
+- Each element contains only the spoken text of the choice (no number)
+- `1番`, `Option 1`, `Choice 1`, `No.1` etc. are forbidden
+
+```json
+"choices": ["Reliable", "Responsible", "Reasonable", "Respectable"],
+"tts": {
+  "choiceTexts": ["Reliable", "Responsible", "Reasonable", "Respectable"]
+}
+```
+
 ## Reference Modes
 
 ### none
@@ -228,6 +277,18 @@ configs/multiple-docs-quizzes.json
 
 configs/multiple-references.json
   Generate from txt + md + pdf reference files
+
+configs/beginner-audio.json
+  Beginner-friendly pack optimized for audio learning (short sentences)
+
+configs/employee-training.json
+  Corporate training pack with professional tone and many examples
+
+configs/exam-preparation.json
+  Hard-difficulty exam prep pack with detailed explanations
+
+configs/academic-reading.json
+  Academic textbook-style reading pack with deep explanations
 ```
 
 ## Generate
@@ -239,6 +300,10 @@ npm run generate -- --config configs/customer-service-source-plus.json
 npm run generate -- --config configs/customer-service-exact-text.json
 npm run generate -- --config configs/multiple-docs-quizzes.json
 npm run generate -- --config configs/multiple-references.json
+npm run generate -- --config configs/beginner-audio.json
+npm run generate -- --config configs/employee-training.json
+npm run generate -- --config configs/exam-preparation.json
+npm run generate -- --config configs/academic-reading.json
 ```
 
 Multiple document / quiz example:
@@ -337,17 +402,28 @@ v0.5 (implemented)
 - Markdown reference support
 - Multiple reference files
 
-v0.6
-- Output format improvements
-- Markdown export
-- Validation improvements
-- Pack consistency checks
+v0.6 (implemented)
+- Generation Profile System
+- targetUser
+- difficulty
+- learningStyle
+- outputMode
+- tone
+- detailLevel
+- exampleLevel
+- audioOptimization
 
 v0.7
-- Generation quality controls
-- Difficulty settings
-- Target audience settings
-- Quiz generation controls
+- Validation improvements
+- Pack consistency checks
+- CLI improvements
+- Metadata enhancements
+
+v0.8
+- Advanced Reference Handling
+- PDF quality improvements
+- Multiple source merging improvements
+- Reference weighting
 ```
 
 ## License
@@ -363,6 +439,14 @@ Issues and pull requests are welcome.
 If you find bugs, validation problems, or ideas for improving learning pack generation, please open an issue.
 
 ## Release History
+
+### v0.6.0
+
+- Generation Profile System
+- targetUser / difficulty / learningStyle / outputMode / tone / detailLevel / exampleLevel
+- audioOptimization for SokQA
+- choiceTexts (no-number) quiz TTS rule
+- metadata.profile
 
 ### v0.5.0
 

@@ -1,0 +1,24 @@
+{
+  "id": "employee-training-pack",
+  "title": "Employee Training Pack",
+  "description": "Corporate training pack for employees with professional tone and on-the-job guidance.",
+  "theme": "customer service for convenience store staff",
+  "language": "en",
+  "documentCount": 1,
+  "quizCount": 1,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/employee-training-pack",
+  "targetUser": "employee",
+  "difficulty": "normal",
+  "learningStyle": "balanced",
+  "outputMode": "training",
+  "tone": "professional",
+  "detailLevel": "normal",
+  "exampleLevel": "many",
+  "audioOptimization": false,
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}

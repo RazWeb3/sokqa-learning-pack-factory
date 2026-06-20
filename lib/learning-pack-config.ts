@@ -4,6 +4,25 @@ import path from "node:path"
 export type ReferenceMode = "none" | "source_only" | "source_plus" | "exact_text_document"
 export const SUPPORTED_REFERENCE_EXTENSIONS = [".txt", ".md", ".pdf"] as const
 
+export type TargetUser = "beginner" | "student" | "employee" | "manager" | "general"
+export type Difficulty = "easy" | "normal" | "hard"
+export type LearningStyle = "audio" | "reading" | "quiz" | "balanced"
+export type OutputMode = "study" | "training" | "exam"
+export type Tone = "friendly" | "professional" | "academic"
+export type DetailLevel = "short" | "normal" | "detailed"
+export type ExampleLevel = "none" | "few" | "many"
+
+export type GenerationProfile = {
+  targetUser?: TargetUser
+  difficulty?: Difficulty
+  learningStyle?: LearningStyle
+  outputMode?: OutputMode
+  tone?: Tone
+  detailLevel?: DetailLevel
+  exampleLevel?: ExampleLevel
+  audioOptimization?: boolean
+}
+
 export type LearningPackConfig = {
   id: string
   title: string
@@ -20,6 +39,40 @@ export type LearningPackConfig = {
     paths?: string[]
     mode: ReferenceMode
   }
+} & GenerationProfile
+
+export const DEFAULT_PROFILE: Required<GenerationProfile> = {
+  targetUser: "general",
+  difficulty: "normal",
+  learningStyle: "balanced",
+  outputMode: "study",
+  tone: "friendly",
+  detailLevel: "normal",
+  exampleLevel: "few",
+  audioOptimization: false,
+}
+
+export const PROFILE_VALUES = {
+  targetUser: ["beginner", "student", "employee", "manager", "general"] as const,
+  difficulty: ["easy", "normal", "hard"] as const,
+  learningStyle: ["audio", "reading", "quiz", "balanced"] as const,
+  outputMode: ["study", "training", "exam"] as const,
+  tone: ["friendly", "professional", "academic"] as const,
+  detailLevel: ["short", "normal", "detailed"] as const,
+  exampleLevel: ["none", "few", "many"] as const,
+} as const
+
+export function resolveProfile(config: GenerationProfile): Required<GenerationProfile> {
+  return {
+    targetUser: config.targetUser ?? DEFAULT_PROFILE.targetUser,
+    difficulty: config.difficulty ?? DEFAULT_PROFILE.difficulty,
+    learningStyle: config.learningStyle ?? DEFAULT_PROFILE.learningStyle,
+    outputMode: config.outputMode ?? DEFAULT_PROFILE.outputMode,
+    tone: config.tone ?? DEFAULT_PROFILE.tone,
+    detailLevel: config.detailLevel ?? DEFAULT_PROFILE.detailLevel,
+    exampleLevel: config.exampleLevel ?? DEFAULT_PROFILE.exampleLevel,
+    audioOptimization: config.audioOptimization ?? DEFAULT_PROFILE.audioOptimization,
+  }
 }
 
 function isPlainText(value: unknown) {
@@ -35,6 +88,10 @@ function assert(condition: unknown, message: string): asserts condition {
 function assertIntegerInRange(value: unknown, name: string, min: number) {
   assert(Number.isInteger(value), `${name} must be an integer`)
   assert((value as number) >= min, `${name} must be >= ${min}`)
+}
+
+function assertOneOf<T extends string>(value: unknown, name: string, allowed: readonly T[]) {
+  assert(typeof value === "string" && (allowed as readonly string[]).includes(value), `${name} must be one of ${allowed.join("/")}`)
 }
 
 export function resolveFrom(baseDir: string, maybeRelativePath: string) {
@@ -100,6 +157,32 @@ export async function validateLearningPackConfig(config: LearningPackConfig, con
     config.reference.mode === "exact_text_document"
   assert(isValidMode, "reference.mode must be one of none/source_only/source_plus/exact_text_document")
 
+  // Generation profile validation
+  if (config.targetUser !== undefined) {
+    assertOneOf(config.targetUser, "targetUser", PROFILE_VALUES.targetUser)
+  }
+  if (config.difficulty !== undefined) {
+    assertOneOf(config.difficulty, "difficulty", PROFILE_VALUES.difficulty)
+  }
+  if (config.learningStyle !== undefined) {
+    assertOneOf(config.learningStyle, "learningStyle", PROFILE_VALUES.learningStyle)
+  }
+  if (config.outputMode !== undefined) {
+    assertOneOf(config.outputMode, "outputMode", PROFILE_VALUES.outputMode)
+  }
+  if (config.tone !== undefined) {
+    assertOneOf(config.tone, "tone", PROFILE_VALUES.tone)
+  }
+  if (config.detailLevel !== undefined) {
+    assertOneOf(config.detailLevel, "detailLevel", PROFILE_VALUES.detailLevel)
+  }
+  if (config.exampleLevel !== undefined) {
+    assertOneOf(config.exampleLevel, "exampleLevel", PROFILE_VALUES.exampleLevel)
+  }
+  if (config.audioOptimization !== undefined) {
+    assert(typeof config.audioOptimization === "boolean", "audioOptimization must be a boolean")
+  }
+
   const referencePaths = normalizeReferencePaths(config.reference)
   const hasReference = config.reference.enabled && referencePaths.length > 0
 
@@ -141,4 +224,3 @@ export async function loadLearningPackConfig(configPath: string): Promise<Learni
   await validateLearningPackConfig(config, absPath)
   return config
 }
-

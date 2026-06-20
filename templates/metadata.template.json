@@ -1,7 +1,18 @@
 {
-  "id": "customer-service-pack",
-  "title": "Customer Service Training",
-  "version": "0.5.0",
+  "id": "example-pack",
+  "title": "Example Pack",
+  "version": "0.6.0",
+  "profile": {
+    "targetUser": "general",
+    "difficulty": "normal",
+    "learningStyle": "balanced",
+    "outputMode": "study",
+    "tone": "friendly",
+    "detailLevel": "normal",
+    "exampleLevel": "few",
+    "audioOptimization": false
+  },
+  "references": [],
   "documents": ["doc_01.json"],
   "quizzes": ["quiz_01.json"]
 }

@@ -1,0 +1,24 @@
+{
+  "id": "beginner-audio-pack",
+  "title": "Beginner Audio Pack",
+  "description": "Beginner-friendly pack optimized for audio learning with short sentences.",
+  "theme": "customer service for convenience store staff",
+  "language": "en",
+  "documentCount": 1,
+  "quizCount": 1,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/beginner-audio-pack",
+  "targetUser": "beginner",
+  "difficulty": "easy",
+  "learningStyle": "audio",
+  "outputMode": "study",
+  "tone": "friendly",
+  "detailLevel": "short",
+  "exampleLevel": "few",
+  "audioOptimization": true,
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}

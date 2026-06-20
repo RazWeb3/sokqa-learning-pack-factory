@@ -1,0 +1,24 @@
+{
+  "id": "academic-reading-pack",
+  "title": "Academic Reading Pack",
+  "description": "Academic textbook-style pack focused on reading with deep explanations and examples.",
+  "theme": "customer service for convenience store staff",
+  "language": "en",
+  "documentCount": 1,
+  "quizCount": 1,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/academic-reading-pack",
+  "targetUser": "student",
+  "difficulty": "normal",
+  "learningStyle": "reading",
+  "outputMode": "study",
+  "tone": "academic",
+  "detailLevel": "detailed",
+  "exampleLevel": "many",
+  "audioOptimization": false,
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}
