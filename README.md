@@ -1,26 +1,87 @@
-# Learning Pack Generator Powered by Trae Skills
+# SokQA Learning Pack Factory
 
-Local-first generator that uses Trae Skills to produce `document JSON`, `quiz JSON`, `metadata.json`, validate them, and export `learning-pack.zip` into `output/`.
+Local-first CLI tool that generates SokQA-compatible `document JSON`, `quiz JSON`, `metadata.json`, validates them, and exports `learning-pack.zip` into `output/`.
+
+Trae Skills are included as optional workflow definitions under `.trae/skills`, but the generator itself runs through local scripts and config files.
 
 ## Core Idea
 
 This repository is not a web service.
 
-It is a local tool for Trae IDE:
+It is a local-first CLI workflow:
 
 ```text
 User
--> Trae IDE
--> Skills
+-> Config JSON
+-> Local CLI
 -> Document JSON / Quiz JSON / Metadata JSON
 -> Validator
 -> ZIP Export
 -> output/
 ```
 
-## Skill Architecture
+Optional skill-based workflow:
 
-The main assets live under `.trae/skills`.
+```text
+IDE / Agent
+-> .trae/skills
+-> Config / Reference Files
+-> Local CLI
+-> Validation
+-> ZIP Export
+```
+
+## Features
+
+- Local-first
+- CLI + config driven
+- Optional Trae Skills workflow
+- Multiple Documents
+- Multiple Quiz Packs
+- Multiple Reference Sources
+- TXT / Markdown / PDF support
+- Generation Profile System
+- Validation System
+- ZIP Export
+- SokQA Compatible
+
+## Example Workflow
+
+```text
+Reference Files
+(TXT / MD / PDF)
+      |
+      v
+Learning Pack Generator
+      |
+      v
+Document JSON
+Quiz JSON
+Metadata JSON
+      |
+      v
+Validation
+      |
+      v
+ZIP Export
+```
+
+## Example Output
+
+```text
+output/
+└─ customer-service-pack/
+   ├─ metadata.json
+   ├─ doc_01.json
+   ├─ doc_02.json
+   ├─ quiz_01.json
+   └─ learning-pack.zip
+```
+
+## Optional Skill Workflow
+
+The repository includes optional workflow definitions under `.trae/skills`.
+They are useful for Trae/ZCode/agent-assisted development, but the core generator can be used from the CLI with config files.
 
 - `sokqa-pack-factory-spec`
 - `llm-agents-orchestrator-sokqa`
@@ -58,13 +119,13 @@ This OSS does not generate audio files.
 ## Directory Layout
 
 ```text
-.trae/
-skills/
-scripts/
-examples/
-templates/
-output/
-lib/
+.trae/         Optional skill definitions for agent-assisted workflows
+configs/       Generation config examples
+scripts/       CLI entrypoints
+lib/           Core generation, validation, reference loading, ZIP export
+examples/      Sample reference text
+templates/     Metadata template
+output/        Generated packs (gitignored)
 README.md
 LICENSE
 ```
@@ -414,10 +475,10 @@ v0.6 (implemented)
 - audioOptimization
 
 v0.7
-- Validation improvements
-- Pack consistency checks
-- CLI improvements
-- Metadata enhancements
+- Config Simplification
+- Preset Profiles
+- Better Prompt Templates
+- Improved Generation Quality
 
 v0.8
 - Advanced Reference Handling

@@ -1,12 +1,13 @@
 ---
-title: SokQA Learning Pack Factory OSS Edition Spec v0.5
+title: SokQA Learning Pack Factory OSS Edition Spec v0.7 Draft
 ---
 
-# Learning Pack Generator Powered by Trae Skills
+# SokQA Learning Pack Factory
 
 ## 背景
 
-このプロジェクトの価値は Web UI ではなく、Trae Skills による学習パック生成にある。
+このプロジェクトの価値は Web UI ではなく、ローカルCLIと設定ファイルによるSokQA互換学習パック生成にある。
+Trae Skills は補助的なワークフロー定義として維持するが、実行環境をTrae IDEに限定しない。
 
 旧定義:
 
@@ -17,12 +18,12 @@ SokQA Import Tool
 新定義:
 
 ```text
-Learning Pack Generator powered by Trae Skills
+Local CLI + config driven SokQA Learning Pack Generator
 ```
 
 ## 目的
 
-ユーザーが Trae IDE 上でテーマや教材を入力し、Trae Skills が以下を実行する。
+ユーザーが config JSON と必要に応じた参考資料を用意し、ローカルCLIが以下を実行する。
 
 - 分析
 - 教材生成
@@ -30,12 +31,15 @@ Learning Pack Generator powered by Trae Skills
 - 検証
 - ZIP Export
 
+補足:
+IDE/Agentから `.trae/skills` を使って同じ流れを補助してもよい。
+
 ## 実行フロー
 
 ```text
 User
--> Trae IDE
--> Skills
+-> Config JSON
+-> Local CLI
 -> Document JSON
 -> Quiz JSON
 -> Metadata JSON
@@ -44,10 +48,24 @@ User
 -> output/
 ```
 
+Optional Agent Workflow:
+
+```text
+User
+-> IDE / Agent
+-> .trae/skills
+-> Config JSON / Reference Files
+-> Local CLI
+-> Validator
+-> ZIP Export
+-> output/
+```
+
 ## リポジトリ定義
 
 - このリポジトリは Web サービスではない
-- ローカル実行の Skills + scripts ツールである
+- ローカル実行の CLI + config + scripts ツールである
+- `.trae/skills` は optional workflow definitions として維持する
 - Next.js UI は削除する
 - 生成物は `output/<pack-id>/` に保存する
 
@@ -186,7 +204,7 @@ TTS 方針:
 - 音声品質は検証しない
 - 構造のみ検証する
 
-## Skill Architecture
+## Optional Skill Workflow
 
 維持する Skill 名:
 
@@ -214,7 +232,9 @@ TTS 方針:
 
 追加:
 
-- Trae Skills
+- CLI-first workflow
+- Config-driven generation
+- Optional skill workflow
 - Local First
 - ZIP Export
 - Examples
@@ -261,19 +281,26 @@ node_modules/
 - Markdown Reference Support
 - Multiple Reference Files
 
-### v0.6
+### v0.6 (implemented)
 
-- Output Format Improvements
-- Markdown Export
-- Validation Improvements
-- Pack Consistency Check
+- Generation Profile System
+- targetUser / difficulty / learningStyle / outputMode / tone / detailLevel / exampleLevel
+- audioOptimization
+- choiceTexts (no-number) quiz TTS rule
 
 ### v0.7
 
-- Generation Quality Controls
-- Difficulty Settings
-- Target Audience Settings
-- Quiz Generation Controls
+- Config Simplification
+- Preset Profiles
+- Better Prompt Templates
+- Improved Generation Quality
+
+### v0.8
+
+- Advanced Reference Handling
+- PDF Quality Improvements
+- Multiple Source Merging Improvements
+- Reference Weighting
 
 ## 非目標
 
@@ -290,7 +317,8 @@ node_modules/
 
 ## 完了条件
 
-- Trae Skills のみで生成できる
+- CLI + config で生成できる
+- optional skills 経由でも生成フローを補助できる
 - `document JSON` 生成成功
 - `quiz JSON` 生成成功
 - `metadata.json` 生成成功
@@ -302,4 +330,4 @@ node_modules/
 
 ## 最終目標
 
-誰でも Trae IDE で利用できる Skill Driven Learning Pack Generator として成立させる。
+誰でもローカルCLIとconfigで利用でき、必要に応じてIDE/AgentのSkill Workflowでも補助できる、SokQA互換 Learning Pack Generator として成立させる。
