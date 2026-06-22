@@ -1,0 +1,29 @@
+{
+  "id": "employee-training-v7-pack",
+  "title": "Employee Training Pack v7",
+  "description": "v0.7 quality showcase: application-style quizzes, theme-derived distractors, and standard-depth explanations for workplace learning.",
+  "theme": "customer service for convenience store staff",
+  "language": "en",
+  "documentCount": 1,
+  "quizCount": 1,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/employee-training-v7-pack",
+  "targetUser": "employee",
+  "difficulty": "normal",
+  "learningStyle": "balanced",
+  "outputMode": "training",
+  "tone": "professional",
+  "detailLevel": "normal",
+  "exampleLevel": "many",
+  "audioOptimization": false,
+  "distractorSource": "theme",
+  "quizStyle": "application",
+  "explanationDepth": "standard",
+  "practicalExamples": true,
+  "sentenceLength": "medium",
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}

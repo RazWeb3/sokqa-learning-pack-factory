@@ -478,6 +478,11 @@ describe("learning pack", () => {
       detailLevel: "short",
       exampleLevel: "few",
       audioOptimization: true,
+      distractorSource: "fixed",
+      quizStyle: "concept-check",
+      explanationDepth: "standard",
+      practicalExamples: false,
+      sentenceLength: "medium",
     })
     expect(pack.documents).toHaveLength(1)
     expect(pack.quizzes).toHaveLength(1)
@@ -541,6 +546,11 @@ describe("learning pack", () => {
       detailLevel: "normal",
       exampleLevel: "few",
       audioOptimization: false,
+      distractorSource: "fixed",
+      quizStyle: "concept-check",
+      explanationDepth: "standard",
+      practicalExamples: false,
+      sentenceLength: "medium",
     })
   })
 
@@ -559,5 +569,120 @@ describe("learning pack", () => {
 
     expect(validation.passed).toBe(false)
     expect(validation.errors.some((error) => error.includes("choiceTexts must not contain choice numbers"))).toBe(true)
+  })
+
+  // ----- v0.7 Generation Quality Controls -----
+
+  it("uses theme-derived distractors when distractorSource is theme", () => {
+    const pack = generateLearningPack(
+      buildConfig({ id: "distractor-theme-pack", distractorSource: "theme" }),
+    )
+
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.profile.distractorSource).toBe("theme")
+    // The fixed customer-service distractors must NOT appear anymore.
+    const fixedDistractors = ["Ignore customer context", "Skip confirmation steps", "Use unclear language"]
+    for (const question of pack.quizzes[0].questions) {
+      for (const fixed of fixedDistractors) {
+        expect(question.choices).not.toContain(fixed)
+      }
+      // Theme-derived distractors reference the theme.
+      expect(question.choices.slice(1).some((choice) => choice.toLowerCase().includes("customer service"))).toBe(true)
+    }
+  })
+
+  it("uses reference-derived distractors when distractorSource is reference", () => {
+    const referenceText = [
+      "Smile and greet the customer clearly.",
+      "Repeat the total amount and confirm before payment.",
+      "Stay calm and listen to the customer.",
+      "Apologize politely and offer the next step clearly.",
+    ].join("\n")
+    const referenceLines = splitNonEmptyLines(referenceText)
+    const pack = generateLearningPack(
+      buildConfig({
+        id: "distractor-reference-pack",
+        distractorSource: "reference",
+        reference: { enabled: true, path: "references/customer-service-manual.txt", mode: "source_plus" },
+      }),
+      referenceText,
+    )
+
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.profile.distractorSource).toBe("reference")
+    // At least one distractor across the quiz must be drawn verbatim from the reference.
+    const allDistractors = pack.quizzes[0].questions.flatMap((question) => question.choices.slice(1))
+    expect(allDistractors.some((choice) => referenceLines.includes(choice))).toBe(true)
+  })
+
+  it("flavors the quiz stem with application style when quizStyle is application", () => {
+    const pack = generateLearningPack(
+      buildConfig({ id: "quiz-application-pack", quizStyle: "application" }),
+    )
+
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.profile.quizStyle).toBe("application")
+    for (const question of pack.quizzes[0].questions) {
+      expect(question.question.toLowerCase()).toContain("apply")
+    }
+  })
+
+  it("flavors the quiz stem with a case-study prompt when quizStyle is case-study", () => {
+    const pack = generateLearningPack(
+      buildConfig({ id: "quiz-case-study-pack", quizStyle: "case-study" }),
+    )
+
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.profile.quizStyle).toBe("case-study")
+    for (const question of pack.quizzes[0].questions) {
+      expect(question.question.toLowerCase()).toContain("case study")
+    }
+  })
+
+  it("writes a multi-sentence explanation when explanationDepth is detailed", () => {
+    const pack = generateLearningPack(
+      buildConfig({ id: "explanation-detailed-pack", explanationDepth: "detailed" }),
+    )
+
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.profile.explanationDepth).toBe("detailed")
+    for (const question of pack.quizzes[0].questions) {
+      // Detailed explanations explain why the other options fail, so they are long.
+      expect(question.explanation.split(/[.。]/).filter(Boolean).length).toBeGreaterThan(1)
+    }
+  })
+
+  it("forbids placeholder examples and emits concrete ones when practicalExamples is true", () => {
+    const pack = generateLearningPack(
+      buildConfig({
+        id: "practical-examples-pack",
+        practicalExamples: true,
+        exampleLevel: "many",
+      }),
+    )
+
+    expect(pack.validation.passed).toBe(true)
+    expect(pack.metadata.profile.practicalExamples).toBe(true)
+    const documentTexts = pack.documents[0].documents.map((item) => item.text)
+    // The forbidden placeholder line must not appear.
+    expect(documentTexts.some((text) => text.includes("Apply customer service to a practical scenario."))).toBe(false)
+    // A concrete example referencing the theme must appear instead.
+    expect(documentTexts.some((text) => /Example \d+:/.test(text) && text.toLowerCase().includes("customer service"))).toBe(true)
+  })
+
+  it("shortens sentences when sentenceLength is short even without audio style", () => {
+    const longPack = generateLearningPack(
+      buildConfig({ id: "sentence-long-pack", sentenceLength: "long", audioOptimization: false, learningStyle: "reading" }),
+    )
+    const shortPack = generateLearningPack(
+      buildConfig({ id: "sentence-short-pack", sentenceLength: "short", audioOptimization: false, learningStyle: "reading" }),
+    )
+
+    expect(shortPack.validation.passed).toBe(true)
+    expect(shortPack.metadata.profile.sentenceLength).toBe("short")
+    const longIntro = longPack.documents[0].documents[0].text
+    const shortIntro = shortPack.documents[0].documents[0].text
+    // Short mode clips the intro to the first clause, so it must be no longer than the long version.
+    expect(shortIntro.length).toBeLessThanOrEqual(longIntro.length)
   })
 })

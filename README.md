@@ -41,6 +41,7 @@ IDE / Agent
 - Multiple Reference Sources
 - TXT / Markdown / PDF support
 - Generation Profile System
+- Generation Quality Controls
 - Validation System
 - ZIP Export
 - SokQA Compatible
@@ -214,6 +215,41 @@ Example:
 
 The resolved profile is recorded in `metadata.json` under the `profile` key.
 
+## Generation Quality Controls (v0.7)
+
+Since v0.7, the config can also control **the quality of the generated content**
+(where wrong quiz choices come from, quiz style, explanation depth, whether
+examples are concrete, and sentence length). These settings make the v0.6 profile
+settings (`difficulty`, `targetUser`, `learningStyle`) take real effect on output.
+
+All quality-control settings are optional. When omitted, defaults are applied.
+
+| Setting | Allowed values | Default | Effect |
+|---|---|---|---|
+| `distractorSource` | `fixed` / `theme` / `reference` | `fixed` | Where quiz wrong choices come from. `fixed` = legacy customer-service distractors. `theme` = generated from the theme. `reference` = drawn from the reference material. |
+| `quizStyle` | `concept-check` / `application` / `case-study` | `concept-check` | Quiz question type. `concept-check` = basic confirmation. `application` = applied practice. `case-study` = real-case decision. |
+| `explanationDepth` | `short` / `standard` / `detailed` | `standard` | Depth of the quiz `explanation`. `short` = one sentence. `standard` = a few sentences. `detailed` = explains why each wrong option fails. |
+| `practicalExamples` | `true` / `false` | `false` | When `true`, the placeholder example line is forbidden and concrete theme-specific examples are generated instead. |
+| `sentenceLength` | `short` / `medium` / `long` | `medium` | Target sentence length. `short` = audio-friendly short sentences. `medium` = standard. `long` = full detailed sentences. |
+
+Example:
+
+```json
+{
+  "distractorSource": "theme",
+  "quizStyle": "application",
+  "explanationDepth": "detailed",
+  "practicalExamples": true,
+  "sentenceLength": "medium"
+}
+```
+
+v0.7 also makes the v0.6 profile settings take real effect:
+
+- `difficulty` — now reaches the quiz stem, the correct-answer wording, and a Challenge/Basics line in the document body.
+- `targetUser` — now drives a vocabulary register note in the document.
+- `learningStyle` — `reading` adds a reading note, `quiz` adds a review cue, `audio` keeps the short-sentence path. (Previously only `audio` had any effect.)
+
 ## choiceTexts Rule (Quiz TTS)
 
 The app controls choice numbering, so the generator must not include numbers in `tts.choiceTexts`.
@@ -350,6 +386,15 @@ configs/exam-preparation.json
 
 configs/academic-reading.json
   Academic textbook-style reading pack with deep explanations
+
+configs/beginner-audio-v7.json
+  v0.7 quality showcase: theme distractors + practical examples + short sentences
+
+configs/employee-training-v7.json
+  v0.7 quality showcase: application quizzes + theme distractors + practical examples
+
+configs/exam-hard-v7.json
+  v0.7 quality showcase: case-study quizzes + reference distractors + detailed explanations
 ```
 
 ## Generate
@@ -365,6 +410,9 @@ npm run generate -- --config configs/beginner-audio.json
 npm run generate -- --config configs/employee-training.json
 npm run generate -- --config configs/exam-preparation.json
 npm run generate -- --config configs/academic-reading.json
+npm run generate -- --config configs/beginner-audio-v7.json
+npm run generate -- --config configs/employee-training-v7.json
+npm run generate -- --config configs/exam-hard-v7.json
 ```
 
 Multiple document / quiz example:
@@ -474,11 +522,14 @@ v0.6 (implemented)
 - exampleLevel
 - audioOptimization
 
-v0.7
-- Config Simplification
-- Preset Profiles
-- Better Prompt Templates
+v0.7 (implemented)
 - Improved Generation Quality
+- distractorSource (fixed / theme / reference)
+- quizStyle (concept-check / application / case-study)
+- explanationDepth (short / standard / detailed)
+- practicalExamples (concrete examples instead of placeholders)
+- sentenceLength (short / medium / long)
+- difficulty / targetUser / learningStyle now take real effect
 
 v0.8
 - Advanced Reference Handling
@@ -500,6 +551,14 @@ Issues and pull requests are welcome.
 If you find bugs, validation problems, or ideas for improving learning pack generation, please open an issue.
 
 ## Release History
+
+### v0.7.0
+
+- Generation Quality Controls
+- distractorSource / quizStyle / explanationDepth / practicalExamples / sentenceLength
+- difficulty / targetUser / learningStyle now reflected in generated content
+- Theme-derived and reference-derived quiz distractors
+- Concrete (non-placeholder) practical examples
 
 ### v0.6.0
 

@@ -12,6 +12,12 @@ export type Tone = "friendly" | "professional" | "academic"
 export type DetailLevel = "short" | "normal" | "detailed"
 export type ExampleLevel = "none" | "few" | "many"
 
+// v0.7 Generation Quality Controls
+export type DistractorSource = "fixed" | "theme" | "reference"
+export type QuizStyle = "concept-check" | "application" | "case-study"
+export type ExplanationDepth = "short" | "standard" | "detailed"
+export type SentenceLength = "short" | "medium" | "long"
+
 export type GenerationProfile = {
   targetUser?: TargetUser
   difficulty?: Difficulty
@@ -21,6 +27,12 @@ export type GenerationProfile = {
   detailLevel?: DetailLevel
   exampleLevel?: ExampleLevel
   audioOptimization?: boolean
+  // v0.7 Generation Quality Controls
+  distractorSource?: DistractorSource
+  quizStyle?: QuizStyle
+  explanationDepth?: ExplanationDepth
+  practicalExamples?: boolean
+  sentenceLength?: SentenceLength
 }
 
 export type LearningPackConfig = {
@@ -50,6 +62,12 @@ export const DEFAULT_PROFILE: Required<GenerationProfile> = {
   detailLevel: "normal",
   exampleLevel: "few",
   audioOptimization: false,
+  // v0.7 Generation Quality Controls
+  distractorSource: "fixed",
+  quizStyle: "concept-check",
+  explanationDepth: "standard",
+  practicalExamples: false,
+  sentenceLength: "medium",
 }
 
 export const PROFILE_VALUES = {
@@ -60,6 +78,12 @@ export const PROFILE_VALUES = {
   tone: ["friendly", "professional", "academic"] as const,
   detailLevel: ["short", "normal", "detailed"] as const,
   exampleLevel: ["none", "few", "many"] as const,
+  // v0.7 Generation Quality Controls
+  distractorSource: ["fixed", "theme", "reference"] as const,
+  quizStyle: ["concept-check", "application", "case-study"] as const,
+  explanationDepth: ["short", "standard", "detailed"] as const,
+  practicalExamples: [false, true] as const,
+  sentenceLength: ["short", "medium", "long"] as const,
 } as const
 
 export function resolveProfile(config: GenerationProfile): Required<GenerationProfile> {
@@ -72,6 +96,12 @@ export function resolveProfile(config: GenerationProfile): Required<GenerationPr
     detailLevel: config.detailLevel ?? DEFAULT_PROFILE.detailLevel,
     exampleLevel: config.exampleLevel ?? DEFAULT_PROFILE.exampleLevel,
     audioOptimization: config.audioOptimization ?? DEFAULT_PROFILE.audioOptimization,
+    // v0.7 Generation Quality Controls
+    distractorSource: config.distractorSource ?? DEFAULT_PROFILE.distractorSource,
+    quizStyle: config.quizStyle ?? DEFAULT_PROFILE.quizStyle,
+    explanationDepth: config.explanationDepth ?? DEFAULT_PROFILE.explanationDepth,
+    practicalExamples: config.practicalExamples ?? DEFAULT_PROFILE.practicalExamples,
+    sentenceLength: config.sentenceLength ?? DEFAULT_PROFILE.sentenceLength,
   }
 }
 
@@ -181,6 +211,23 @@ export async function validateLearningPackConfig(config: LearningPackConfig, con
   }
   if (config.audioOptimization !== undefined) {
     assert(typeof config.audioOptimization === "boolean", "audioOptimization must be a boolean")
+  }
+
+  // v0.7 Generation Quality Controls validation
+  if (config.distractorSource !== undefined) {
+    assertOneOf(config.distractorSource, "distractorSource", PROFILE_VALUES.distractorSource)
+  }
+  if (config.quizStyle !== undefined) {
+    assertOneOf(config.quizStyle, "quizStyle", PROFILE_VALUES.quizStyle)
+  }
+  if (config.explanationDepth !== undefined) {
+    assertOneOf(config.explanationDepth, "explanationDepth", PROFILE_VALUES.explanationDepth)
+  }
+  if (config.practicalExamples !== undefined) {
+    assert(typeof config.practicalExamples === "boolean", "practicalExamples must be a boolean")
+  }
+  if (config.sentenceLength !== undefined) {
+    assertOneOf(config.sentenceLength, "sentenceLength", PROFILE_VALUES.sentenceLength)
   }
 
   const referencePaths = normalizeReferencePaths(config.reference)

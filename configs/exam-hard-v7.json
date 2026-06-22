@@ -1,0 +1,29 @@
+{
+  "id": "exam-hard-v7-pack",
+  "title": "Exam Preparation Pack v7",
+  "description": "v0.7 quality showcase: case-study quizzes, reference-derived distractors, and detailed explanations for hard exam preparation.",
+  "theme": "customer service",
+  "language": "en",
+  "documentCount": 1,
+  "quizCount": 1,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/exam-hard-v7-pack",
+  "targetUser": "student",
+  "difficulty": "hard",
+  "learningStyle": "quiz",
+  "outputMode": "exam",
+  "tone": "professional",
+  "detailLevel": "detailed",
+  "exampleLevel": "few",
+  "audioOptimization": false,
+  "distractorSource": "reference",
+  "quizStyle": "case-study",
+  "explanationDepth": "detailed",
+  "practicalExamples": true,
+  "sentenceLength": "long",
+  "reference": {
+    "enabled": true,
+    "path": "references/customer-service-manual.txt",
+    "mode": "source_plus"
+  }
+}

@@ -50,7 +50,7 @@ export type MetadataFile = {
   description: string
   createdAt: string
   generator: "sokqa-learning-pack-factory"
-  version: "0.6.0"
+  version: "0.7.0"
   language: string
   source: {
     hasReference: boolean
@@ -177,24 +177,66 @@ function chunkEvenly<T>(items: T[], chunkCount: number) {
 
 type ProfileAdapter = {
   isAudioOptimized: boolean
+  // v0.7: learningStyle now drives sentence shape, not just audio
+  isQuizHeavy: boolean
+  isReadingHeavy: boolean
+  // v0.7: sentenceLength "short" shortens sentences like the audio path
+  shouldShortenSentences: boolean
   detailLabel: string
   audienceLabel: string
   toneLabel: string
   exampleCount: number
+  // v0.7: practicalExamples replaces placeholder examples with concrete theme-derived ones
+  usePracticalExamples: boolean
   intro: string
   summary: (theme: string) => string
   practice: string
   explanationPrefix: string
+  // v0.7: vocabulary register driven by targetUser
+  vocabularyRegister: string
   quizQuestionTemplate: (theme: string, index: number, total: number) => string
+  // v0.7: quizStyle drives the correct-answer wording
   choiceA: (theme: string) => string
-  choiceB: string
-  choiceC: string
-  choiceD: string
-  explanationTemplate: (theme: string) => string
+  // v0.7: distractorSource drives the wrong-answer pool
+  distractors: (theme: string, referenceLines: string[]) => string[]
+  explanationTemplate: (theme: string, index: number) => string
+}
+
+// v0.7: fixed distractors kept for backward compatibility (distractorSource: "fixed").
+const FIXED_DISTRACTORS = ["Ignore customer context", "Skip confirmation steps", "Use unclear language"]
+
+// v0.7: theme-derived distractor wording. These are wrong *approaches* relative to a theme,
+// so they stay plausible-but-incorrect without being hardcoded to customer service.
+function themeDistractors(theme: string): string[] {
+  return [
+    `Skip the basics of ${theme}`,
+    `Apply ${theme} without checking context`,
+    `Use unclear wording when explaining ${theme}`,
+  ]
+}
+
+// v0.7: reference-derived distractors. Picks plausible-but-wrong reference lines.
+// Falls back to theme distractors when the reference pool is too small.
+function referenceDistractors(referenceLines: string[]): string[] {
+  const pool = referenceLines
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && line.length <= 120)
+  if (pool.length < 3) {
+    return themeDistractors("the reference material")
+  }
+  // Use the last lines as distractors (the correct answer is built separately).
+  return pool.slice(-3)
 }
 
 function buildProfileAdapter(profile: Required<GenerationProfile>): ProfileAdapter {
+  // v0.7: audio is still short-sentence optimized, but reading/quiz/balanced now
+  // have distinct effects in the document/quiz builders rather than collapsing.
   const isAudioOptimized = profile.audioOptimization || profile.learningStyle === "audio"
+  const isQuizHeavy = profile.learningStyle === "quiz"
+  const isReadingHeavy = profile.learningStyle === "reading"
+  // v0.7: sentenceLength "short" yields short sentences (audio-friendly),
+  // "medium" is the default, "long" leaves text intact for detailed reading.
+  const shouldShortenSentences = profile.sentenceLength === "short" || isAudioOptimized
 
   const detailLabels: Record<string, string> = {
     short: "Key Point",
@@ -212,6 +254,14 @@ function buildProfileAdapter(profile: Required<GenerationProfile>): ProfileAdapt
     friendly: "Friendly",
     professional: "Professional",
     academic: "Academic",
+  }
+  // v0.7: vocabulary register reflects targetUser in actual wording.
+  const vocabularyRegisters: Record<string, string> = {
+    beginner: "plain",
+    student: "study-oriented",
+    employee: "workplace",
+    manager: "strategic",
+    general: "everyday",
   }
 
   const exampleCountByLevel = { none: 0, few: 1, many: 3 } as const
@@ -239,43 +289,84 @@ function buildProfileAdapter(profile: Required<GenerationProfile>): ProfileAdapt
     general: "Explanation: ",
   }
 
+  // v0.7: correct-answer wording combines quizStyle with difficulty.
+  // difficulty now shifts the answer between basics (easy) and applied work (hard),
+  // while quizStyle sets the question type.
+  const difficultyChoiceSuffix: Record<string, string> = {
+    easy: "starting from the basics",
+    normal: "as the standard step",
+    hard: "in a real applied scenario",
+  }
+  const choiceAByStyle: Record<string, (theme: string, difficulty: string) => string> = {
+    "concept-check": (theme, difficulty) =>
+      `Focus on the core concept of ${theme} ${difficultyChoiceSuffix[difficulty]}`,
+    application: (theme, difficulty) =>
+      `Apply ${theme} in a realistic situation ${difficultyChoiceSuffix[difficulty]}`,
+    "case-study": (theme, difficulty) =>
+      `Decide the best action for ${theme} ${difficultyChoiceSuffix[difficulty]} given a real case`,
+  }
+
   return {
     isAudioOptimized,
+    isQuizHeavy,
+    isReadingHeavy,
+    shouldShortenSentences,
     detailLabel: detailLabels[profile.detailLevel],
     audienceLabel: audienceLabels[profile.targetUser],
     toneLabel: toneLabels[profile.tone],
+    vocabularyRegister: vocabularyRegisters[profile.targetUser],
     exampleCount: exampleCountByLevel[profile.exampleLevel],
+    usePracticalExamples: profile.practicalExamples,
     intro: introByTone[profile.tone],
     summary: summaryByTone[profile.tone],
     practice: practiceByMode[profile.outputMode],
     explanationPrefix: explanationPrefixByAudience[profile.targetUser],
     quizQuestionTemplate: (theme, index, total) => {
+      // v0.7: quizStyle flavors the question stem; exam mode keeps numbered format.
+      // difficulty also flavors the stem so easy/hard questions read differently.
+      const difficultyCue =
+        profile.difficulty === "hard"
+          ? " (applied level)"
+          : profile.difficulty === "easy"
+            ? " (basics level)"
+            : ""
+      const styleCue =
+        profile.learningStyle === "quiz"
+          ? " Review carefully."
+          : profile.learningStyle === "reading"
+            ? " Use the reading material."
+            : ""
       if (profile.outputMode === "exam") {
-        return `Question ${index + 1} of ${total}: Select the best option regarding ${theme}.`
+        return `Question ${index + 1} of ${total}: Select the best option regarding ${theme}.${difficultyCue}`
       }
-      return `Which choice best aligns with the theme: ${theme}?`
+      if (profile.quizStyle === "case-study") {
+        return `Case study: Which action best handles ${theme}?${difficultyCue}${styleCue}`
+      }
+      if (profile.quizStyle === "application") {
+        return `How should you apply ${theme} in practice?${difficultyCue}${styleCue}`
+      }
+      return `Which choice best aligns with the theme: ${theme}?${difficultyCue}${styleCue}`
     },
-    choiceA: (theme) => {
-      if (profile.difficulty === "hard") {
-        return `Apply best practice for ${theme} in a real scenario`
+    choiceA: (theme) => choiceAByStyle[profile.quizStyle](theme, profile.difficulty),
+    distractors: (theme, referenceLines) => {
+      if (profile.distractorSource === "theme") {
+        return themeDistractors(theme)
       }
-      if (profile.difficulty === "easy") {
-        return `Focus on the basics of ${theme}`
+      if (profile.distractorSource === "reference") {
+        return referenceDistractors(referenceLines)
       }
-      return `Focus on ${theme}`
+      return FIXED_DISTRACTORS
     },
-    choiceB: "Ignore customer context",
-    choiceC: "Skip confirmation steps",
-    choiceD: "Use unclear language",
-    explanationTemplate: (theme) => {
+    explanationTemplate: (theme, index) => {
       const prefix = explanationPrefixByAudience[profile.targetUser]
-      if (profile.detailLevel === "detailed") {
-        return `${prefix}This option directly aligns with ${theme} and reflects the recommended approach covered in the document.`
+      // v0.7: explanationDepth controls the depth of the quiz explanation.
+      if (profile.explanationDepth === "detailed") {
+        return `${prefix}The best option applies ${theme} correctly. The other options fail because they skip context, ignore confirmation, or use unclear wording — all of which undermine the ${profile.quizStyle.replace("-", " ")} goal of question ${index + 1}.`
       }
-      if (profile.detailLevel === "short") {
-        return `${prefix}Matches ${theme}.`
+      if (profile.explanationDepth === "short") {
+        return `${prefix}Best matches ${theme}.`
       }
-      return `${prefix}It directly matches the theme: ${theme}.`
+      return `${prefix}It directly matches the theme: ${theme}, fitting the ${profile.quizStyle.replace("-", " ")} question.`
     },
   }
 }
@@ -341,7 +432,7 @@ function buildMetadataFile(
     description: config.description?.trim() || "Generated learning pack",
     createdAt,
     generator: "sokqa-learning-pack-factory",
-    version: "0.6.0",
+    version: "0.7.0",
     language: config.language,
     source,
     profile,
@@ -353,6 +444,7 @@ function buildMetadataFile(
 
 function buildGenericDocumentItems(config: LearningPackConfig, adapter: ProfileAdapter, strict: boolean) {
   const items: Array<{ text: string; ttsText: string }> = []
+  const profile = resolveProfile(config)
 
   items.push({
     text: `Intro (${adapter.toneLabel}): ${adapter.intro}`,
@@ -371,6 +463,15 @@ function buildGenericDocumentItems(config: LearningPackConfig, adapter: ProfileA
     })
   }
 
+  // v0.7: reading style adds a deeper explanation paragraph reflecting vocabulary register.
+  if (adapter.isReadingHeavy) {
+    const readingText = `Reading note (${adapter.vocabularyRegister} vocabulary): Read the key points above carefully and connect them to the goal of ${config.title}.`
+    items.push({
+      text: readingText,
+      ttsText: strict ? readingText : ensureEndsWithComma(toTts(config.language, readingText)),
+    })
+  }
+
   // detailLevel adds deeper explanation sections
   if (adapter.detailLabel === "Deep Dive" || adapter.detailLabel === "Detail") {
     const detailText = `${adapter.detailLabel}: This pack is designed for ${adapter.audienceLabel.toLowerCase()} learners.`
@@ -380,12 +481,31 @@ function buildGenericDocumentItems(config: LearningPackConfig, adapter: ProfileA
     })
   }
 
-  // exampleLevel adds example sections
+  // exampleLevel adds example sections.
+  // v0.7: practicalExamples=true forbids the placeholder "Apply X to a practical scenario"
+  // and instead generates concrete, theme-specific example sentences.
   for (let i = 0; i < adapter.exampleCount; i += 1) {
-    const text = `Example ${i + 1}: Apply ${config.theme} to a practical scenario.`
+    const text = adapter.usePracticalExamples
+      ? buildPracticalExample(config.theme, adapter, i)
+      : `Example ${i + 1}: Apply ${config.theme} to a practical scenario.`
     items.push({
       text,
       ttsText: strict ? text : ensureEndsWithComma(toTts(config.language, text)),
+    })
+  }
+
+  // v0.7: difficulty now reaches the document body too, not just choiceA.
+  if (profile.difficulty === "hard") {
+    const challengeText = `Challenge: Apply ${config.theme} to a non-obvious, real-world case.`
+    items.push({
+      text: challengeText,
+      ttsText: strict ? challengeText : ensureEndsWithComma(toTts(config.language, challengeText)),
+    })
+  } else if (profile.difficulty === "easy") {
+    const basicsText = `Basics: Start from the simplest point of ${config.theme}.`
+    items.push({
+      text: basicsText,
+      ttsText: strict ? basicsText : ensureEndsWithComma(toTts(config.language, basicsText)),
     })
   }
 
@@ -398,7 +518,8 @@ function buildGenericDocumentItems(config: LearningPackConfig, adapter: ProfileA
     ttsText: strict ? adapter.practice : ensureEndsWithComma(toTts(config.language, adapter.practice)),
   })
 
-  if (adapter.isAudioOptimized) {
+  // v0.7: short sentences apply for both audio and sentenceLength: "short".
+  if (adapter.shouldShortenSentences) {
     return items.map((item) => ({
       text: shortenForAudio(item.text, true),
       ttsText: shortenForAudio(item.ttsText, true),
@@ -406,6 +527,16 @@ function buildGenericDocumentItems(config: LearningPackConfig, adapter: ProfileA
   }
 
   return items
+}
+
+// v0.7: concrete, theme-specific examples (replaces placeholder when practicalExamples=true).
+function buildPracticalExample(theme: string, adapter: ProfileAdapter, index: number): string {
+  const angles = [
+    `Example ${index + 1}: At work, someone following ${theme} would greet clearly and confirm details before acting.`,
+    `Example ${index + 1}: A learner practicing ${theme} reviews the situation, then chooses the polite next step.`,
+    `Example ${index + 1}: In a real case of ${theme}, staying calm and explaining the next step is the recommended action.`,
+  ]
+  return angles[index % angles.length]
 }
 
 function buildSourceOnlyDocumentItems(lines: string[]) {
@@ -433,7 +564,8 @@ function buildSourcePlusDocumentItems(config: LearningPackConfig, adapter: Profi
     ttsText: ensureEndsWithComma(toTts(config.language, adapter.practice)),
   })
 
-  if (adapter.isAudioOptimized) {
+  // v0.7: short sentences apply for both audio and sentenceLength: "short".
+  if (adapter.shouldShortenSentences) {
     return items.map((item) => ({
       text: shortenForAudio(item.text, true),
       ttsText: shortenForAudio(item.ttsText, true),
@@ -463,17 +595,27 @@ function buildQuizTts(config: LearningPackConfig, question: string, choices: [st
   }
 }
 
-function buildGenericQuizQuestions(config: LearningPackConfig, adapter: ProfileAdapter, count: number): QuizFile["questions"] {
+function buildGenericQuizQuestions(
+  config: LearningPackConfig,
+  adapter: ProfileAdapter,
+  count: number,
+  referenceLines: string[] = [],
+): QuizFile["questions"] {
   const questions: QuizFile["questions"] = []
   for (let index = 0; index < count; index += 1) {
+    // v0.7: distractorSource chooses where the three wrong choices come from.
+    const distractorPool = adapter.distractors(config.theme, referenceLines)
+    const distractorA = distractorPool[index % Math.max(distractorPool.length, 1)] ?? "Ignore the key point"
+    const distractorB = distractorPool[(index + 1) % Math.max(distractorPool.length, 1)] ?? "Skip the key step"
+    const distractorC = distractorPool[(index + 2) % Math.max(distractorPool.length, 1)] ?? "Use unclear wording"
     const choices: [string, string, string, string] = [
       adapter.choiceA(config.theme),
-      adapter.choiceB,
-      adapter.choiceC,
-      adapter.choiceD,
+      distractorA,
+      distractorB,
+      distractorC,
     ]
     const question = adapter.quizQuestionTemplate(config.theme, index, count)
-    const explanation = adapter.explanationTemplate(config.theme)
+    const explanation = adapter.explanationTemplate(config.theme, index)
 
     questions.push({
       id: `q-${index + 1}`,
@@ -629,7 +771,7 @@ function validateMetadata(payload: PackPayload) {
   if (metadata.generator !== "sokqa-learning-pack-factory") {
     throw new Error("metadata.generator is invalid")
   }
-  if (metadata.version !== "0.6.0") {
+  if (metadata.version !== "0.7.0") {
     throw new Error("metadata.version is invalid")
   }
   if (!isPlainText(metadata.language)) {
@@ -678,6 +820,11 @@ function validateMetadata(payload: PackPayload) {
   if (typeof profile.detailLevel !== "string") throw new Error("metadata.profile.detailLevel is required")
   if (typeof profile.exampleLevel !== "string") throw new Error("metadata.profile.exampleLevel is required")
   if (typeof profile.audioOptimization !== "boolean") throw new Error("metadata.profile.audioOptimization is required")
+  if (typeof profile.distractorSource !== "string") throw new Error("metadata.profile.distractorSource is required")
+  if (typeof profile.quizStyle !== "string") throw new Error("metadata.profile.quizStyle is required")
+  if (typeof profile.explanationDepth !== "string") throw new Error("metadata.profile.explanationDepth is required")
+  if (typeof profile.practicalExamples !== "boolean") throw new Error("metadata.profile.practicalExamples is required")
+  if (typeof profile.sentenceLength !== "string") throw new Error("metadata.profile.sentenceLength is required")
 
   for (const document of documents) {
     if (document.language !== metadata.language) {
@@ -871,10 +1018,13 @@ export function generateLearningPack(configInput: LearningPackConfig, referenceT
       for (let index = 0; index < quizCount; index += 1) {
         quizzes.push(buildQuizFile(config, index, buildSourceOnlyQuizQuestions(config, lines, questionsPerQuiz)))
       }
-    } else if (mode === "source_plus") {
-      for (let index = 0; index < quizCount; index += 1) quizzes.push(buildQuizFile(config, index, buildGenericQuizQuestions(config, adapter, questionsPerQuiz)))
     } else {
-      for (let index = 0; index < quizCount; index += 1) quizzes.push(buildQuizFile(config, index, buildGenericQuizQuestions(config, adapter, questionsPerQuiz)))
+      // v0.7: pass reference lines so distractorSource: "reference" can draw wrong
+      // answers from the reference material (empty when no reference is configured).
+      const referenceLines = referenceValue ? splitNonEmptyLines(referenceValue) : []
+      for (let index = 0; index < quizCount; index += 1) {
+        quizzes.push(buildQuizFile(config, index, buildGenericQuizQuestions(config, adapter, questionsPerQuiz, referenceLines)))
+      }
     }
   }
 

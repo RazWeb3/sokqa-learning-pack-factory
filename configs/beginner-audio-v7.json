@@ -1,0 +1,29 @@
+{
+  "id": "beginner-audio-v7-pack",
+  "title": "Beginner Audio Pack v7",
+  "description": "v0.7 quality showcase: theme-derived distractors, practical examples, and short audio-friendly sentences.",
+  "theme": "customer service for convenience store staff",
+  "language": "en",
+  "documentCount": 1,
+  "quizCount": 1,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/beginner-audio-v7-pack",
+  "targetUser": "beginner",
+  "difficulty": "easy",
+  "learningStyle": "audio",
+  "outputMode": "study",
+  "tone": "friendly",
+  "detailLevel": "short",
+  "exampleLevel": "few",
+  "audioOptimization": true,
+  "distractorSource": "theme",
+  "quizStyle": "concept-check",
+  "explanationDepth": "short",
+  "practicalExamples": true,
+  "sentenceLength": "short",
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}

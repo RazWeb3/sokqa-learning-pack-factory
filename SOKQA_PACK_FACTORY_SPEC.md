@@ -288,12 +288,15 @@ node_modules/
 - audioOptimization
 - choiceTexts (no-number) quiz TTS rule
 
-### v0.7
+### v0.7 (implemented)
 
-- Config Simplification
-- Preset Profiles
-- Better Prompt Templates
 - Improved Generation Quality
+- distractorSource (fixed / theme / reference)
+- quizStyle (concept-check / application / case-study)
+- explanationDepth (short / standard / detailed)
+- practicalExamples (concrete examples instead of placeholders)
+- sentenceLength (short / medium / long)
+- difficulty / targetUser / learningStyle now take real effect
 
 ### v0.8
 
