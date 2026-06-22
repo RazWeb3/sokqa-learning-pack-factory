@@ -532,10 +532,11 @@ v0.7 (implemented)
 - difficulty / targetUser / learningStyle now take real effect
 
 v0.8
+- Config Simplification
+- Preset Profiles
 - Advanced Reference Handling
-- PDF quality improvements
-- Multiple source merging improvements
-- Reference weighting
+- Reference Weighting
+- PDF Quality Improvements
 ```
 
 ## License
@@ -554,11 +555,14 @@ If you find bugs, validation problems, or ideas for improving learning pack gene
 
 ### v0.7.0
 
-- Generation Quality Controls
-- distractorSource / quizStyle / explanationDepth / practicalExamples / sentenceLength
-- difficulty / targetUser / learningStyle now reflected in generated content
-- Theme-derived and reference-derived quiz distractors
-- Concrete (non-placeholder) practical examples
+- Added distractorSource
+- Added quizStyle
+- Added explanationDepth
+- Added practicalExamples
+- Added sentenceLength
+- Improved difficulty handling
+- Improved targetUser handling
+- Improved learningStyle behavior
 
 ### v0.6.0
 
