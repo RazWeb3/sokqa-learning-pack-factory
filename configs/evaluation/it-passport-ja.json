@@ -1,0 +1,28 @@
+{
+  "id": "it-passport-ja-pack",
+  "title": "ITパスポート入門",
+  "description": "ITパスポート試験向けの基礎学習パック。資格試験の前提知識を概説し、概念確認クイズで定着を図る。",
+  "theme": "ITパスポート試験 基礎知識",
+  "language": "ja",
+  "documentCount": 2,
+  "quizCount": 2,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/evaluation/it-passport-ja",
+  "targetUser": "beginner",
+  "difficulty": "easy",
+  "learningStyle": "balanced",
+  "outputMode": "exam",
+  "tone": "friendly",
+  "detailLevel": "normal",
+  "exampleLevel": "few",
+  "quizStyle": "concept-check",
+  "distractorSource": "theme",
+  "explanationDepth": "standard",
+  "practicalExamples": true,
+  "sentenceLength": "medium",
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}

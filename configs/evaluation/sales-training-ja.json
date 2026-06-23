@@ -1,0 +1,28 @@
+{
+  "id": "sales-training-ja-pack",
+  "title": "営業研修",
+  "description": "営業職向け研修パック。ケーススタディ形式で実務判断力を養う。",
+  "theme": "営業活動の基本スキル・商談・顧客管理",
+  "language": "ja",
+  "documentCount": 2,
+  "quizCount": 2,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/evaluation/sales-training-ja",
+  "targetUser": "employee",
+  "difficulty": "hard",
+  "learningStyle": "reading",
+  "outputMode": "training",
+  "tone": "professional",
+  "detailLevel": "detailed",
+  "exampleLevel": "many",
+  "quizStyle": "case-study",
+  "distractorSource": "theme",
+  "explanationDepth": "detailed",
+  "practicalExamples": true,
+  "sentenceLength": "medium",
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}

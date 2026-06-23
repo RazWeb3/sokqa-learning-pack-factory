@@ -1,0 +1,28 @@
+{
+  "id": "customer-support-training-ja-pack",
+  "title": "カスタマーサポート研修",
+  "description": "企業研修向けカスタマーサポート学習パック。応用問題で実践力を養う。",
+  "theme": "カスタマーサポートの基本スキルと対応方法",
+  "language": "ja",
+  "documentCount": 2,
+  "quizCount": 2,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/evaluation/customer-support-training-ja",
+  "targetUser": "employee",
+  "difficulty": "normal",
+  "learningStyle": "balanced",
+  "outputMode": "training",
+  "tone": "professional",
+  "detailLevel": "normal",
+  "exampleLevel": "many",
+  "quizStyle": "application",
+  "distractorSource": "theme",
+  "explanationDepth": "standard",
+  "practicalExamples": true,
+  "sentenceLength": "medium",
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}

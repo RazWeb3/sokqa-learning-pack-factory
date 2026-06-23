@@ -1,0 +1,28 @@
+{
+  "id": "japan-prefectures-ja-pack",
+  "title": "日本47都道府県",
+  "description": "日本47都道府県の一般教養・暗記系学習パック。テーマ由来の誤答肢で知識定着を図る。",
+  "theme": "日本47都道府県の場所・特徴・名産品",
+  "language": "ja",
+  "documentCount": 3,
+  "quizCount": 3,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/evaluation/japan-prefectures-ja",
+  "targetUser": "student",
+  "difficulty": "normal",
+  "learningStyle": "quiz",
+  "outputMode": "study",
+  "tone": "friendly",
+  "detailLevel": "short",
+  "exampleLevel": "few",
+  "quizStyle": "concept-check",
+  "distractorSource": "theme",
+  "explanationDepth": "short",
+  "practicalExamples": false,
+  "sentenceLength": "short",
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}

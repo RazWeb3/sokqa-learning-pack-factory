@@ -1,0 +1,29 @@
+{
+  "id": "english-conversation-ja-pack",
+  "title": "英会話フレーズ",
+  "description": "英会話フレーズ学習パック。TTS最適化・短文でリスニング学習に最適。choiceTextsの品質確認用。",
+  "theme": "日常英会話の基本フレーズと表現",
+  "language": "ja",
+  "documentCount": 2,
+  "quizCount": 2,
+  "questionsPerQuiz": 5,
+  "outputDir": "output/evaluation/english-conversation-ja",
+  "targetUser": "beginner",
+  "difficulty": "easy",
+  "learningStyle": "audio",
+  "outputMode": "study",
+  "tone": "friendly",
+  "detailLevel": "short",
+  "exampleLevel": "many",
+  "quizStyle": "application",
+  "distractorSource": "theme",
+  "explanationDepth": "short",
+  "practicalExamples": true,
+  "sentenceLength": "short",
+  "audioOptimization": true,
+  "reference": {
+    "enabled": false,
+    "path": "",
+    "mode": "none"
+  }
+}
