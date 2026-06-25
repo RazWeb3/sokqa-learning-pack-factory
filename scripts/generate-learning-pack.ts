@@ -76,7 +76,7 @@ async function main() {
       throw new Error(`Validation failed: ${pack.validation.errors.join("; ")}`)
     }
 
-    const result = await writeLearningPackOutput(pack, config.outputDir)
+    const result = await writeLearningPackOutput(pack, config.outputDir, { theme: config.theme })
     console.log(`Generated: ${pack.metadata.title}`)
     console.log(`Pack ID: ${pack.metadata.id}`)
     console.log(`Output: ${result.packDirectory}`)
@@ -112,7 +112,7 @@ async function main() {
     throw new Error(`Validation failed: ${pack.validation.errors.join("; ")}`)
   }
 
-  const result = await writeLearningPackOutput(pack, `output/${pack.metadata.id}`)
+  const result = await writeLearningPackOutput(pack, `output/${pack.metadata.id}`, { theme: "custom topic" })
 
   console.log(`Generated: ${pack.metadata.title}`)
   console.log(`Pack ID: ${pack.metadata.id}`)

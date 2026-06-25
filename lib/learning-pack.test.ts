@@ -105,7 +105,7 @@ describe("learning pack", () => {
       expect(pack.metadata.documents).toEqual(["doc_01.json", "doc_02.json", "doc_03.json"])
       expect(pack.metadata.quizzes).toEqual(["quiz_01.json", "quiz_02.json"])
 
-      const exportResult = await writeLearningPackOutput(pack, outputDir)
+      const exportResult = await writeLearningPackOutput(pack, outputDir, { theme: "customer service" })
       const files = (await readdir(exportResult.packDirectory)).sort()
       expect(files).toEqual([
         "doc_01.json",
@@ -113,6 +113,7 @@ describe("learning pack", () => {
         "doc_03.json",
         "learning-pack.zip",
         "metadata.json",
+        "quality-report.json",
         "quiz_01.json",
         "quiz_02.json",
       ])
@@ -124,6 +125,7 @@ describe("learning pack", () => {
         "quiz_01.json",
         "quiz_02.json",
         "learning-pack.zip",
+        "quality-report.json",
       ])
       expect(await readZipFileNames(pack)).toEqual([
         "doc_01.json",
@@ -266,9 +268,9 @@ describe("learning pack", () => {
       expect(pack.quizzes).toHaveLength(0)
       expect(pack.metadata.quizzes).toEqual([])
 
-      const exportResult = await writeLearningPackOutput(pack, outputDir)
+      const exportResult = await writeLearningPackOutput(pack, outputDir, { theme: config.theme })
       const files = (await readdir(exportResult.packDirectory)).sort()
-      expect(files).toEqual(["doc_01.json", "learning-pack.zip", "metadata.json"])
+      expect(files).toEqual(["doc_01.json", "learning-pack.zip", "metadata.json", "quality-report.json"])
       expect(await readZipFileNames(pack)).toEqual(["doc_01.json", "metadata.json"])
     } finally {
       await rm(outputDir, { recursive: true, force: true })

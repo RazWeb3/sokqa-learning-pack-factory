@@ -117,6 +117,17 @@ output/customer-service-pack/
 `tts` fields stay in JSON for SokQA compatibility.
 This OSS does not generate audio files.
 
+## Quality Validation (v0.8)
+
+This factory does not guarantee the quality of LLM-generated content.
+
+Instead, after generation it writes a `quality-report.json` file into the output directory to help you detect:
+
+- Duplicate questions / duplicate explanations / identical choice patterns
+- Duplicate documents (high text similarity, title-only difference, identical section structure)
+- Template-like generic distractors
+- Template-like generic explanations (and explanations missing theme keywords)
+
 ## Directory Layout
 
 ```text
