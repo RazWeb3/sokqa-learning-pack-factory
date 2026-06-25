@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest"
 
 import { generateLearningPack, validateLearningPack } from "./learning-pack"
 import type { LearningPackConfig } from "./learning-pack-config"
-import { buildLearningPackZipBytes, writeLearningPackOutput } from "./learning-pack-zip"
+import { buildLearningPackZipBytes, buildQualityReport, writeLearningPackOutput } from "./learning-pack-zip"
 import { loadLearningPackConfig, resolveFrom, validateLearningPackConfig } from "./learning-pack-config"
 import { loadReferenceContext, loadReferenceFile } from "./reference-loader"
 
@@ -119,13 +119,13 @@ describe("learning pack", () => {
       ])
       expect(exportResult.files).toEqual([
         "metadata.json",
+        "quality-report.json",
         "doc_01.json",
         "doc_02.json",
         "doc_03.json",
         "quiz_01.json",
         "quiz_02.json",
         "learning-pack.zip",
-        "quality-report.json",
       ])
       expect(await readZipFileNames(pack)).toEqual([
         "doc_01.json",
@@ -135,10 +135,39 @@ describe("learning pack", () => {
         "quiz_01.json",
         "quiz_02.json",
       ])
+      const reportText = await readFile(path.join(exportResult.packDirectory, "quality-report.json"), "utf8")
+      const report = JSON.parse(reportText) as ReturnType<typeof buildQualityReport>
+      expect(report).toEqual({
+        score: expect.any(Number),
+        duplicateQuestionRate: expect.any(Number),
+        duplicateDocumentRate: expect.any(Number),
+        genericDistractors: expect.any(Number),
+        genericExplanations: expect.any(Number),
+        warnings: expect.any(Array),
+      })
+      expect(report.score).toBeGreaterThanOrEqual(0)
+      expect(report.score).toBeLessThanOrEqual(100)
+      expect(await readZipFileNames(pack)).not.toContain("quality-report.json")
       await expect(stat(path.join(exportResult.packDirectory, "learning-pack.zip"))).resolves.toBeDefined()
     } finally {
       await rm(outputDir, { recursive: true, force: true })
     }
+  })
+
+  it("builds a quality score in the 0 to 100 range", () => {
+    const pack = generateLearningPack(
+      buildConfig({
+        id: "score-pack",
+        documentCount: 2,
+        quizCount: 2,
+        questionsPerQuiz: 5,
+      }),
+    )
+
+    const report = buildQualityReport(pack, { theme: "customer service" })
+
+    expect(report.score).toBeGreaterThanOrEqual(0)
+    expect(report.score).toBeLessThanOrEqual(100)
   })
 
   it("fails when quiz choices are not length 4", () => {
@@ -272,6 +301,7 @@ describe("learning pack", () => {
       const files = (await readdir(exportResult.packDirectory)).sort()
       expect(files).toEqual(["doc_01.json", "learning-pack.zip", "metadata.json", "quality-report.json"])
       expect(await readZipFileNames(pack)).toEqual(["doc_01.json", "metadata.json"])
+      expect(await readZipFileNames(pack)).not.toContain("quality-report.json")
     } finally {
       await rm(outputDir, { recursive: true, force: true })
     }

@@ -106,6 +106,7 @@ Generated packs are written to `output/<pack-id>/`.
 ```text
 output/customer-service-pack/
   metadata.json
+  quality-report.json
   doc_01.json
   doc_02.json
   doc_03.json
@@ -127,6 +128,29 @@ Instead, after generation it writes a `quality-report.json` file into the output
 - Duplicate documents (high text similarity, title-only difference, identical section structure)
 - Template-like generic distractors
 - Template-like generic explanations (and explanations missing theme keywords)
+
+`quality-report.json` is written next to `learning-pack.zip`, but it is not included inside the ZIP.
+
+Example:
+
+```json
+{
+  "score": 92,
+  "duplicateQuestionRate": 5,
+  "duplicateDocumentRate": 3,
+  "genericDistractors": 1,
+  "genericExplanations": 0,
+  "warnings": [
+    "duplicate-question: q-1 ~ q-2 (question=91%, explanation=88%, choices=true)"
+  ]
+}
+```
+
+- `score`: Simple penalty-based score from 0 to 100. Starts at 100 and subtracts penalties for duplicate rates and generic content counts.
+- `duplicateQuestionRate`: Percent of quiz questions flagged by question similarity, explanation similarity, or identical choice patterns.
+- `duplicateDocumentRate`: Percent of documents flagged by text similarity, title-only difference, or identical section structure.
+- `genericDistractors`: Count of questions containing template-like wrong choices.
+- `genericExplanations`: Count of questions containing template-like explanations or explanations without theme keywords.
 
 ## Directory Layout
 
@@ -161,6 +185,7 @@ Generated pack:
 ```text
 output/<pack-id>/
   metadata.json
+  quality-report.json
   doc_01.json
   doc_02.json
   doc_03.json
