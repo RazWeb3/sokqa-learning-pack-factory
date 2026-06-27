@@ -55,7 +55,7 @@ description: "document/quiz/metadata JSON を v0.5仕様で検証する。複数
 
 - `tts.choiceTexts` がある場合、4件の配列であること
 - `tts.choiceTexts` の各要素は選択肢本文のみを含み、選択肢番号を読み上げないこと
-- `tts.choicesText`（番号付き連結）が残っていないこと
+- quiz TTS の選択肢フィールドは `tts.choiceTexts` のみであること
 
 #### 番号読み上げ禁止チェック
 
@@ -99,5 +99,5 @@ No.2
 - `reference.paths` が空配列である（reference 有効時）
 - 対応外の reference 形式が混入している
 - `tts.choiceTexts` に番号読み上げが含まれている
-- `tts.choicesText`（番号付き連結）が残っている
+- quiz TTS の選択肢フィールドが `tts.choiceTexts` ではない
 - ZIP 内ファイル一覧が `metadata` と一致しない

@@ -74,7 +74,7 @@ config-driven generation が主経路。`configs/<name>.json` を編集して生
 アプリ側で選択肢番号の読み上げを制御するため、生成側では番号を読み上げない。
 
 - `tts.choiceTexts` には選択肢番号を入れない
-- `tts.choicesText`（番号付き連結）は使わない
+- quiz TTS の選択肢フィールドは `tts.choiceTexts` のみを使う
 - `1番`, `2番`, `Option 1`, `Choice 1` のような番号読み上げを入れない
 - `tts.choiceTexts` は `choices` と同じ順序の4件配列にする
 - 各要素には選択肢本文の読み上げ補正のみを入れる

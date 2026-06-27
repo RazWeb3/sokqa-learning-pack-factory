@@ -141,7 +141,7 @@ output/customer-service-pack/
 - `choices` は 4 件固定
 - `answerIndex` は `0-3`
 - `tts.questionText`
-- `tts.choicesText`
+- `tts.choiceTexts`
 - `tts.answerText`
 - `tts.explanationText`
 
