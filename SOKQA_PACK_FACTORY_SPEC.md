@@ -1,5 +1,5 @@
 ---
-title: SokQA Learning Pack Factory OSS Edition Spec v0.7 Draft
+title: SokQA Learning Pack Factory OSS Edition Spec v0.8.0
 ---
 
 # SokQA Learning Pack Factory
@@ -292,13 +292,25 @@ node_modules/
 
 - Completed
 
-### v0.8
+### v0.8.0 (completed)
 
-- Config Simplification
-- Preset Profiles
-- Advanced Reference Handling
-- Reference Weighting
-- PDF Quality Improvements
+- Generation Quality Validation
+- Quality Report (`quality-report.json`)
+- Studio Gap Analysis
+- Automatic Regeneration Design
+- Generation Specification
+- Trae Skills Consistency Audit
+- Trae Skills Synchronization
+
+### v0.9
+
+- Generation Quality Improvement
+- Prompt / Generation Rule Refinement
+- AI IDE Output Quality Improvements
+- Automatic Quality Retry implementation
+- Advanced Validation
+- Better Document Diversity
+- Better Quiz Diversity
 
 ## 非目標
 

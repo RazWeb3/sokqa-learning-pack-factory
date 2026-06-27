@@ -567,12 +567,22 @@ v0.7 (implemented)
 - sentenceLength (short / medium / long)
 - difficulty / targetUser / learningStyle now take real effect
 
-v0.8
-- Config Simplification
-- Preset Profiles
-- Advanced Reference Handling
-- Reference Weighting
-- PDF Quality Improvements
+v0.8.0 (completed)
+- Generation Quality Validation
+- quality-report.json
+- Studio compatibility review
+- Automatic regeneration design
+- Generation Specification for AI IDE workflows
+- Trae Skills consistency audit and synchronization
+
+v0.9
+- Generation Quality Improvement
+- Prompt / generation rule refinement
+- AI IDE output quality improvements
+- Automatic Quality Retry implementation
+- Advanced validation
+- Better document diversity
+- Better quiz diversity
 ```
 
 ## License
@@ -588,6 +598,25 @@ Issues and pull requests are welcome.
 If you find bugs, validation problems, or ideas for improving learning pack generation, please open an issue.
 
 ## Release History
+
+### v0.8.0
+
+Added:
+
+- Generation Quality Validation
+- `quality-report.json`
+- Generation Specification for AI IDE workflows
+- Automatic Regeneration Design
+- Studio Compatibility Review
+- Improved Skills Documentation
+
+Improved:
+
+- Generation Profiles documentation
+- Validation workflow
+- Project documentation
+- AI IDE generation workflow
+- Trae Skills consistency
 
 ### v0.7.0
 
